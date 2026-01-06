@@ -2,6 +2,9 @@
 
 <template>
     <RouterView />
+    <h1>Hello testing style</h1>
 </template>
 
-<style scoped></style>
+<style scoped>
+@import "tailwindcss";
+</style>

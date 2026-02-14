@@ -40,14 +40,25 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
     match response {
         Ok(res) => {
             let json: serde_json::Value = res.json().await.unwrap_or_default();
-            // Extract the text from the deeply nested response:
-            // candidates[0].content.parts[0].text
-            println!("Full Gemini Response: {:#?}", json);
-            json["candidates"][0]["content"]["parts"][0]["text"]
-                .as_str()
-                .unwrap_or("Sorry, I couldn't get an answer.")
-                .to_string()
+
+            // We use .get() to navigate safely and .and_then() to chain the checks
+            let text_result = json
+                .get("candidates")
+                .and_then(|c| c.get(0))
+                .and_then(|first_candidate| first_candidate.get("content"))
+                .and_then(|content| content.get("parts"))
+                .and_then(|parts| parts.get(0))
+                .and_then(|part| part.get("text"))
+                .and_then(|text| text.as_str());
+
+            match text_result {
+                Some(text) => text.to_string(),
+                None => {
+                    println!("JSON structure mismatch: {:?}", json);
+                    "Sorry, I couldn't parse the response.".to_string()
+                }
+            }
         }
-        Err(_) => "Error connecting to Gemini".to_string(),
+        Err(e) => format!("Network error: {}", e),
     }
 }

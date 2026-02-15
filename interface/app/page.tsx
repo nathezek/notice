@@ -1,6 +1,6 @@
 "use client";
 import { ThemeSwitcher } from "@/theme/theme_switcher";
-import { IconSearch } from "@tabler/icons-react";
+import { IconSearch, IconX } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 
 export default function Home() {
@@ -57,6 +57,15 @@ export default function Home() {
           placeholder="Search..."
           onChange={(e) => setInputQuery(e.target.value)}
         />
+        {input_query && (
+          <button
+            type="button"
+            onClick={() => setInputQuery("")}
+            className="absolute right-2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+          >
+            <IconX size={16} />
+          </button>
+        )}
       </form>
 
       <div className="mt-12 min-h-25 w-full max-w-2xl rounded-lg border border-neutral-200 bg-neutral-50 p-6 shadow-sm">

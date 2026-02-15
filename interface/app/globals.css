@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+@font-face {
+  font-family: "Serif";
+  src: url("/fonts/ssf-variable.ttf");
+}
+@font-face {
+  src: url("/fonts/ssf-italic.ttf");
+  font-family: "Serif-Italic";
+}
+
 :root {
   --background: var(--color-neutral-50);
   --foreground: var(--color-neutral-800);
@@ -15,4 +24,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+article {
+  font-family: "Serif", "Times New Roman", Times, serif;
 }

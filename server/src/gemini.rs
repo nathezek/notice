@@ -3,6 +3,12 @@ use serde::Serialize;
 #[derive(Serialize)]
 struct GeminiRequest {
     contents: Vec<Content>,
+    generation_config: GenerationConfig, // Enforces JSON output
+}
+
+#[derive(Serialize)]
+struct GenerationConfig {
+    response_mime_type: String, // Set to "application/json"
 }
 
 #[derive(Serialize)]
@@ -15,7 +21,6 @@ struct Part {
     text: String,
 }
 
-// The actual logic to talk to Gemini
 pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
     let client = reqwest::Client::new();
     let url = format!(
@@ -23,16 +28,30 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
         api_key
     );
 
+    // Explicit schema instructions for the AI
     let prompt = format!(
-        "You are a helpful search engine assistant.
-         Provide a concise, factual answer to the following query: {}",
-        user_query
-    );
+            "You are a Wikipedia-style engine. Categorize the query and respond in JSON.
+
+            Query: {}
+
+            If category is 'WHO' (Person):
+            {{ \"type\": \"who\", \"name\": \"\", \"lifespan\": \"\", \"legacy\": \"\", \"quick_facts\": [] }}
+
+            If category is 'HOW' (Process/Math):
+            {{ \"type\": \"how\", \"steps\": [{{ \"title\": \"\", \"desc\": \"\" }}], \"difficulty\": \"\" }}
+
+            If category is 'WHAT' (General/Concept):
+            {{ \"type\": \"what\", \"definition\": \"\", \"applications\": [], \"history\": \"\" }}",
+            user_query
+        );
 
     let body = GeminiRequest {
         contents: vec![Content {
             parts: vec![Part { text: prompt }],
         }],
+        generation_config: GenerationConfig {
+            response_mime_type: "application/json".to_string(),
+        },
     };
 
     let response = client.post(url).json(&body).send().await;
@@ -40,25 +59,20 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
     match response {
         Ok(res) => {
             let json: serde_json::Value = res.json().await.unwrap_or_default();
-
-            // We use .get() to navigate safely and .and_then() to chain the checks
             let text_result = json
                 .get("candidates")
                 .and_then(|c| c.get(0))
-                .and_then(|first_candidate| first_candidate.get("content"))
-                .and_then(|content| content.get("parts"))
-                .and_then(|parts| parts.get(0))
-                .and_then(|part| part.get("text"))
-                .and_then(|text| text.as_str());
+                .and_then(|c| c.get("content"))
+                .and_then(|c| c.get("parts"))
+                .and_then(|p| p.get(0))
+                .and_then(|p| p.get("text"))
+                .and_then(|t| t.as_str());
 
             match text_result {
                 Some(text) => text.to_string(),
-                None => {
-                    println!("JSON structure mismatch: {:?}", json);
-                    "Sorry, I couldn't parse the response.".to_string()
-                }
+                None => "{\"error\": \"Parsing failed\"}".to_string(),
             }
         }
-        Err(e) => format!("Network error: {}", e),
+        Err(e) => format!("{{\"error\": \"Network error: {}\"}}", e),
     }
 }

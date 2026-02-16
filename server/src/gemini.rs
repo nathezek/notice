@@ -3,12 +3,12 @@ use serde::Serialize;
 #[derive(Serialize)]
 struct GeminiRequest {
     contents: Vec<Content>,
-    generation_config: GenerationConfig, // Enforces JSON output
+    generation_config: GenerationConfig,
 }
 
 #[derive(Serialize)]
 struct GenerationConfig {
-    response_mime_type: String, // Set to "application/json"
+    response_mime_type: String,
 }
 
 #[derive(Serialize)]
@@ -28,22 +28,61 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
         api_key
     );
 
-    // Explicit schema instructions for the AI
     let prompt = format!(
-            "You are a Wikipedia-style engine. Categorize the query and respond in JSON.
+        "You are a smart search engine. Analyze the query and return JSON.
+        Query: '{}'
 
-            Query: {}
+        1. CATEGORIZE the query into one of: 'who', 'what', 'how', 'when', 'where'.
+        2. Based on the category, use the EXACT schema below.
 
-            If category is 'WHO' (Person):
-            {{ \"type\": \"who\", \"name\": \"\", \"lifespan\": \"\", \"legacy\": \"\", \"quick_facts\": [] }}
+        SCENARIO 'who' (Person/Group):
+        {{
+            \"type\": \"who\",
+            \"name\": \"Full Name\",
+            \"lifespan\": \"Born - Died (or Present)\",
+            \"known_for\": \"One sentence summary of fame\",
+            \"achievements\": [\"Major feat 1\", \"Major feat 2\", \"Major feat 3\"]
+        }}
 
-            If category is 'HOW' (Process/Math):
-            {{ \"type\": \"how\", \"steps\": [{{ \"title\": \"\", \"desc\": \"\" }}], \"difficulty\": \"\" }}
+        SCENARIO 'how' (Process/Math/Recipe):
+        {{
+            \"type\": \"how\",
+            \"title\": \"Process Name\",
+            \"difficulty\": \"Easy/Medium/Hard\",
+            \"steps\": [
+                {{ \"step\": 1, \"instruction\": \"Do this first\" }},
+                {{ \"step\": 2, \"instruction\": \"Then do this\" }}
+            ]
+        }}
 
-            If category is 'WHAT' (General/Concept):
-            {{ \"type\": \"what\", \"definition\": \"\", \"applications\": [], \"history\": \"\" }}",
-            user_query
-        );
+        SCENARIO 'what' (Definition/Concept):
+        {{
+            \"type\": \"what\",
+            \"concept\": \"Concept Name\",
+            \"definition\": \"Official definition\",
+            \"application\": \"Real-world use case\",
+            \"origin\": \"Brief history/origin\"
+        }}
+
+        SCENARIO 'when' (Time/Event):
+        {{
+            \"type\": \"when\",
+            \"event\": \"Event Name\",
+            \"date\": \"Exact Date/Era\",
+            \"significance\": \"Why it matters today\",
+            \"timeline\": [\"Pre-event\", \"During event\", \"Post-event\"]
+        }}
+
+        SCENARIO 'where' (Place/Location):
+        {{
+            \"type\": \"where\",
+            \"location\": \"Location Name\",
+            \"region\": \"Country/Continent\",
+            \"facts\": [\"Fact 1\", \"Fact 2\"],
+            \"climate\": \"Climate/Vibe\"
+        }}",
+        user_query
+    );
 
     let body = GeminiRequest {
         contents: vec![Content {
@@ -59,20 +98,11 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
     match response {
         Ok(res) => {
             let json: serde_json::Value = res.json().await.unwrap_or_default();
-            let text_result = json
-                .get("candidates")
-                .and_then(|c| c.get(0))
-                .and_then(|c| c.get("content"))
-                .and_then(|c| c.get("parts"))
-                .and_then(|p| p.get(0))
-                .and_then(|p| p.get("text"))
-                .and_then(|t| t.as_str());
-
-            match text_result {
-                Some(text) => text.to_string(),
-                None => "{\"error\": \"Parsing failed\"}".to_string(),
-            }
+            json["candidates"][0]["content"]["parts"][0]["text"]
+                .as_str()
+                .unwrap_or("{}")
+                .to_string()
         }
-        Err(e) => format!("{{\"error\": \"Network error: {}\"}}", e),
+        Err(_) => "{\"error\": \"offline\"}".to_string(),
     }
 }

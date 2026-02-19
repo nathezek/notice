@@ -36,7 +36,8 @@ body {
     font-family: "Inter", sans-serif;
 }
 
-article {
+article,
+.serif-font {
     font-family: "Serif", serif;
 }
 

@@ -8,14 +8,12 @@ export interface WhoResult {
     known_for: string;
     achievements: string[];
 }
-
 export interface HowResult {
     type: "how";
     title: string;
     difficulty: string;
     steps: { step: number; instruction: string }[];
 }
-
 export interface WhatResult {
     type: "what";
     concept: string;
@@ -23,7 +21,6 @@ export interface WhatResult {
     application: string;
     origin: string;
 }
-
 export interface WhenResult {
     type: "when";
     event: string;
@@ -31,7 +28,6 @@ export interface WhenResult {
     significance: string;
     timeline: string[];
 }
-
 export interface WhereResult {
     type: "where";
     location: string;
@@ -51,9 +47,11 @@ interface SearchState {
     inputQuery: string;
     result: SearchResult | null;
     isLoading: boolean;
+    hasSearched: boolean;
     setInputQuery: (query: string) => void;
     setResult: (result: SearchResult | null) => void;
     setLoading: (loading: boolean) => void;
+    setHasSearched: (val: boolean) => void;
     resetSearch: () => void;
 }
 
@@ -61,8 +59,16 @@ export const useSearchStore = create<SearchState>((set) => ({
     inputQuery: "",
     result: null,
     isLoading: false,
+    hasSearched: false,
     setInputQuery: (query) => set({ inputQuery: query }),
     setResult: (result) => set({ result }),
     setLoading: (loading) => set({ isLoading: loading }),
-    resetSearch: () => set({ result: null, inputQuery: "" }),
+    setHasSearched: (val) => set({ hasSearched: val }),
+    resetSearch: () =>
+        set({
+            inputQuery: "",
+            result: null,
+            isLoading: false,
+            hasSearched: false,
+        }),
 }));

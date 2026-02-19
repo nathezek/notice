@@ -14,7 +14,7 @@ export const WhatBlock = ({ data }: { data: WhatResult }) => {
                     <span className="mb-4 block w-full border-b border-neutral-300 pb-1 font-sans text-xs font-medium tracking-tight text-neutral-400 uppercase dark:border-neutral-700">
                         Application
                     </span>
-                    <article className="text-lg text-neutral-700 dark:text-neutral-300">
+                    <article className="text-lg text-neutral-700 dark:text-neutral-100">
                         {data.application}
                     </article>
                 </div>
@@ -22,7 +22,7 @@ export const WhatBlock = ({ data }: { data: WhatResult }) => {
                     <span className="mb-4 block w-full border-b border-neutral-300 pb-1 font-sans text-xs font-medium tracking-tight text-neutral-400 uppercase dark:border-neutral-700">
                         Origin
                     </span>
-                    <article className="text-lg text-neutral-700 dark:text-neutral-300">
+                    <article className="text-lg text-neutral-700 dark:text-neutral-100">
                         {data.origin}
                     </article>
                 </div>

@@ -11,6 +11,11 @@
 }
 
 @font-face {
+    src: url("/fonts/ed-italic.ttf");
+    font-family: "ED-ITALIC";
+}
+
+@font-face {
     src: url("/fonts/inter-tight.ttf");
     font-family: "Inter";
 }
@@ -33,4 +38,8 @@ body {
 
 article {
     font-family: "Serif", serif;
+}
+
+.ed-italic {
+    font-family: "ED-ITALIC", serif;
 }

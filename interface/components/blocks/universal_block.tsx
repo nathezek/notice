@@ -2,6 +2,7 @@
 
 import { Article } from "@/components/ui/article";
 import { IconMapPin, IconInfoCircle } from "@tabler/icons-react";
+import ReactMarkdown from "react-markdown";
 
 export interface UniversalResultData {
     summary: string;
@@ -15,15 +16,8 @@ export const UniversalBlock = ({ data }: { data: UniversalResultData }) => {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* 1. Main Summary (Article) */}
             <Article>
-                {/* 
-                   For now, we just render the raw string. 
-                   Ideally, we'd use a Markdown parser here (e.g. react-markdown).
-                   Since user asked for Markdown support, I should mention this limitation 
-                   or add a basic parser if time permits. For now, whitespace-pre-wrap 
-                   is a simple start.
-                */}
-                <div className="whitespace-pre-wrap leading-relaxed text-neutral-800 dark:text-neutral-200">
-                    {data.summary}
+                <div className="prose prose-neutral dark:prose-invert max-w-none leading-relaxed text-neutral-800 dark:text-neutral-200">
+                    <ReactMarkdown>{data.summary}</ReactMarkdown>
                 </div>
             </Article>
 

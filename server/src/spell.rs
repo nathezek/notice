@@ -18,21 +18,58 @@ fn spellchecker() -> &'static SymSpell<AsciiStringStrategy> {
 
 /// Returns the corrected query if corrections were made, otherwise None.
 pub fn correct_query(query: &str) -> Option<String> {
-    // Skip correction for very short queries and queries that look like
-    // math/currency (numbers + symbols) to avoid mangling them
-    if query.len() <= 2 || query.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+    let trimmed = query.trim();
+
+    // Skip correction for very short queries, mathematical/currency queries,
+    // queries with quotes (exact matches), or queries that contain uppercase letters
+    if trimmed.len() <= 2 
+        || trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
+        || trimmed.contains('"')
+        || trimmed.contains('\'')
+    {
+        return None;
+    }
+
+    // Strip trailing punctuation for the lookup, but keep it to re-attach later
+    let mut clean_query = trimmed.to_string();
+    let mut trailing_punct = "";
+    if trimmed.ends_with('?') {
+        clean_query.pop();
+        trailing_punct = "?";
+    } else if trimmed.ends_with('.') {
+        clean_query.pop();
+        trailing_punct = ".";
+    }
+
+    let has_inner_caps = clean_query.chars().skip(1).any(|c| c.is_ascii_uppercase());
+    if has_inner_caps {
         return None;
     }
 
     let checker = spellchecker();
 
     // lookup_compound handles multi-word corrections in one pass
-    let suggestions = checker.lookup_compound(query, 2);
+    let suggestions = checker.lookup_compound(&clean_query.to_lowercase(), 2);
 
     if let Some(suggestion) = suggestions.first() {
         let corrected = &suggestion.term;
-        if corrected.to_lowercase() != query.to_lowercase().trim() {
-            return Some(corrected.clone());
+        
+        // If the correction isn't identical to the lowercase input
+        if corrected.to_lowercase() != clean_query.to_lowercase() {
+            // Restore original capitalization for the first letter if needed
+            let mut final_correction = corrected.clone();
+            if let Some(first_char) = trimmed.chars().next() {
+                if first_char.is_ascii_uppercase() {
+                    let mut c = final_correction.chars();
+                    if let Some(f) = c.next() {
+                        final_correction = f.to_uppercase().collect::<String>() + c.as_str();
+                    }
+                }
+            }
+            
+            // Re-attach punctuation
+            final_correction.push_str(trailing_punct);
+            return Some(final_correction);
         }
     }
 

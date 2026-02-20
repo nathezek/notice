@@ -23,7 +23,7 @@ export const UniversalBlock = ({ data }: { data: UniversalResultData }) => {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* 0. Title */}
-            <h1 className="mb-6 text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+            <h1 className="mb-6 text-2xl border-b dark:border-neutral-700 border-neutral-200 pb-3 font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
                 {data.title}
             </h1>
 

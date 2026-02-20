@@ -118,13 +118,13 @@ function SearchResults() {
             />
 
             <motion.div
-                className={`mt-20 grid w-full max-w-6xl grid-cols-1 gap-12 ${showSidebar ? "lg:grid-cols-4 lg:pl-20" : ""}`}
+                className={`mt-20 grid w-full max-w-6xl grid-cols-1 gap-12 ${showSidebar ? "lg:grid-cols-3 lg:pl-20" : ""}`}
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.55, duration: 0.5, ease: "easeOut" }}
             >
                 {/* Left Column: Result */}
-                <div className={showSidebar ? "lg:col-span-3" : "w-full max-w-2xl"}>
+                <div className={showSidebar ? "lg:col-span-2" : "w-full max-w-2xl"}>
                     {/* "Did you mean..." banner */}
                     {correctedQuery && !isLoading && (
                         <div className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">

@@ -69,7 +69,7 @@ async fn handle_search(
                     }).to_string(),
                     corrected_query: None,
                 }),
-                Err(_) => fallback_to_gemini(query, &state.api_key, None, None).await,
+                Err(_) => fallback_to_gemini(query, &state.api_key, None, None, vec![]).await,
             }
         }
 
@@ -94,7 +94,7 @@ async fn handle_search(
                         corrected_query: None,
                     })
                 }
-                None => fallback_to_gemini(query, &state.api_key, None, None).await,
+                None => fallback_to_gemini(query, &state.api_key, None, None, vec![]).await,
             }
         }
 
@@ -114,7 +114,7 @@ async fn handle_search(
                 }),
                 Err(e) => {
                     println!("Currency error: {}", e);
-                    fallback_to_gemini(query, &state.api_key, None, None).await
+                    fallback_to_gemini(query, &state.api_key, None, None, vec![]).await
                 }
             }
         }
@@ -126,16 +126,16 @@ async fn handle_search(
             let effective = if effective.is_empty() { query } else { &effective };
 
             // Scrape web content concurrently with building the response
-            let context = web::gather_context(effective).await;
+            let (urls, context) = web::gather_context(effective).await;
             let context_ref = if context.is_empty() { None } else { Some(context.as_str()) };
 
-            fallback_to_gemini(effective, &state.api_key, corrected, context_ref).await
+            fallback_to_gemini(effective, &state.api_key, corrected, context_ref, urls).await
         }
     }
 }
 
-async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<String>, context: Option<&str>) -> Json<SearchResponse> {
-    let response = gemini::ask_gemini(query, api_key, context).await;
+async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<String>, context: Option<&str>, urls: Vec<String>) -> Json<SearchResponse> {
+    let response = gemini::ask_gemini(query, api_key, context, urls).await;
     Json(SearchResponse {
         result_type: "concept".to_string(),
         content: response,

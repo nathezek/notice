@@ -1,14 +1,14 @@
 use scraper::{Html, Selector};
 
-const MAX_CONTEXT_CHARS: usize = 4000; // Per page limit
-const MAX_PAGES: usize = 3;
+const MAX_CONTEXT_CHARS: usize = 1500; // Per page limit
+const MAX_PAGES: usize = 2;
 
 // ---- DuckDuckGo HTML Search ----
 
 pub async fn search(query: &str) -> Vec<String> {
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
-        .timeout(std::time::Duration::from_secs(8))
+        .timeout(std::time::Duration::from_secs(3))
         .build()
         .unwrap_or_default();
 
@@ -68,7 +68,7 @@ pub async fn search(query: &str) -> Vec<String> {
 pub async fn scrape(url: &str) -> Option<String> {
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
-        .timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(4))
         .build()
         .ok()?;
 
@@ -107,14 +107,16 @@ pub async fn scrape(url: &str) -> Option<String> {
 
 // ---- Context Builder ----
 
-pub async fn gather_context(query: &str) -> String {
+pub async fn gather_context(query: &str) -> (Vec<String>, String) {
     let urls = search(query).await;
     if urls.is_empty() {
-        return String::new();
+        return (vec![], String::new());
     }
 
-    // Scrape top N pages concurrently
-    let tasks: Vec<_> = urls
+    // Clone urls for scraping tasks
+    let scrape_urls = urls.clone();
+
+    let tasks: Vec<_> = scrape_urls
         .into_iter()
         .take(MAX_PAGES)
         .map(|url| tokio::spawn(async move { scrape(&url).await }))
@@ -128,8 +130,8 @@ pub async fn gather_context(query: &str) -> String {
     }
 
     if context_parts.is_empty() {
-        return String::new();
+        return (urls, String::new());
     }
 
-    context_parts.join("\n\n---\n\n")
+    (urls, context_parts.join("\n\n---\n\n"))
 }

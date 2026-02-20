@@ -21,7 +21,7 @@ struct Part {
     text: String,
 }
 
-pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>) -> String {
+pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, urls: Vec<String>) -> String {
     let client = reqwest::Client::new();
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
@@ -97,15 +97,11 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>) 
                 println!("Gemini API Error Status: {}", res.status());
             }
             let raw_text = res.text().await.unwrap_or_default();
-            println!("Gemini Raw Response: {}", raw_text);
-
             let json: serde_json::Value = serde_json::from_str(&raw_text).unwrap_or_default();
             
             let extracted_text = json["candidates"][0]["content"]["parts"][0]["text"]
                 .as_str()
-                .unwrap_or("{\"error\": \"Empty response from Gemini\"}"); // Return JSON error instead of empty object
-            
-            println!("Extracted Text: {}", extracted_text);
+                .unwrap_or("{\"error\": \"Empty response from Gemini\"}");
             
             // formatting check: remove markdown code blocks if present
             let clean_text = extracted_text
@@ -114,7 +110,20 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>) 
                 .trim_start_matches("```")
                 .trim_end_matches("```");
 
-            clean_text.to_string()
+            // Inject the URLs directly into the output JSON to guarantee they exist
+            let mut final_json: serde_json::Value = serde_json::from_str(clean_text).unwrap_or(serde_json::json!({
+                "title": "Search Error",
+                "summary": "Failed to parse response from LLM."
+            }));
+
+            if !urls.is_empty() {
+                let websites_arr: Vec<serde_json::Value> = urls.into_iter().map(|url| {
+                    serde_json::json!({ "url": url, "title": url })
+                }).collect();
+                final_json["websites"] = serde_json::Value::Array(websites_arr);
+            }
+
+            final_json.to_string()
         }
         Err(e) => {
             println!("Network Error: {}", e);

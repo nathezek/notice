@@ -7,6 +7,7 @@ export interface UniversalResult {
     facts?: { label: string; value: string }[];
     related_topics?: string[];
     widgets?: { type: string; query: string }[];
+    websites?: { url: string; title: string; snippet?: string; imageUrl?: string }[];
 }
 
 export interface MathResult {

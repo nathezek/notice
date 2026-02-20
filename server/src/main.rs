@@ -2,6 +2,7 @@ mod calculator;
 mod classifier;
 mod currency;
 mod gemini;
+mod spell;
 
 use axum::{Json, Router, extract::State, routing::post};
 use dotenv::dotenv;
@@ -18,6 +19,7 @@ struct SearchRequest {
 struct SearchResponse {
     result_type: String,
     content: String,
+    corrected_query: Option<String>,
 }
 
 #[derive(Clone)]
@@ -52,6 +54,8 @@ async fn handle_search(
 ) -> Json<SearchResponse> {
     let query = &payload.query;
 
+    // Classify on the RAW query first — structured queries (math/units/currency)
+    // must never be passed through the English spell corrector
     match classifier::classify(query) {
         // ---- Math: evaluate expression directly ----
         classifier::QueryType::Math => {
@@ -62,8 +66,9 @@ async fn handle_search(
                         "expression": query,
                         "result": result
                     }).to_string(),
+                    corrected_query: None,
                 }),
-                Err(_) => fallback_to_gemini(query, &state.api_key).await,
+                Err(_) => fallback_to_gemini(query, &state.api_key, None).await,
             }
         }
 
@@ -85,9 +90,10 @@ async fn handle_search(
                             "result": result_str,
                             "category": r.category
                         }).to_string(),
+                        corrected_query: None,
                     })
                 }
-                None => fallback_to_gemini(query, &state.api_key).await,
+                None => fallback_to_gemini(query, &state.api_key, None).await,
             }
         }
 
@@ -103,25 +109,30 @@ async fn handle_search(
                         "result": format!("{:.2}", r.result),
                         "rate": format!("{:.6}", r.rate)
                     }).to_string(),
+                    corrected_query: None,
                 }),
                 Err(e) => {
                     println!("Currency error: {}", e);
-                    fallback_to_gemini(query, &state.api_key).await
+                    fallback_to_gemini(query, &state.api_key, None).await
                 }
             }
         }
 
-        // ---- General: Gemini ----
+        // ---- General: spell-correct first, then Gemini ----
         classifier::QueryType::General => {
-            fallback_to_gemini(query, &state.api_key).await
+            let corrected = spell::correct_query(query);
+            let effective = corrected.clone().unwrap_or_default();
+            let effective = if effective.is_empty() { query } else { &effective };
+            fallback_to_gemini(effective, &state.api_key, corrected).await
         }
     }
 }
 
-async fn fallback_to_gemini(query: &str, api_key: &str) -> Json<SearchResponse> {
+async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<String>) -> Json<SearchResponse> {
     let response = gemini::ask_gemini(query, api_key).await;
     Json(SearchResponse {
         result_type: "concept".to_string(),
         content: response,
+        corrected_query,
     })
 }

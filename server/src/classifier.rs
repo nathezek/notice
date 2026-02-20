@@ -3,17 +3,22 @@ use regex::Regex;
 
 // --- Compiled once at startup ---
 
+use crate::calculator::normalize_math;
+
 fn math_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        // Symbolic: "2 + 2", "sqrt(9)", "(100*3)/4"
-        // Natural: "square root of 9", "5 plus 3", "what is 10 divided by 2", "calculate 50 mod 7"
+        // Symbolic: "2 + 2", "(100*3)/4"
+        // Natural: "square root of 9", "sqrt of nine", "9 squared", "5 plus 3"
+        // "what is 10 divided by 2", "calculate 50 mod 7"
         Regex::new(concat!(
             r"(?i)^\s*[\d\s\.\+\-\*\/\^\%\(\)]+$",
-            r"|^\s*(sqrt|sin|cos|tan|log|ln|abs|ceil|floor)\s*\(",
-            r"|\b(square\s+root\s+of|cube\s+root\s+of)\b",
-            r"|\b\d+(\.\d+)?\s*(plus|minus|times|multiplied\s+by|divided\s+by|mod|to\s+the\s+power\s+of)\s*\d+",
-            r"|^\s*(what\s+is|calculate|compute|evaluate|what'?s)\s+[\d\s\+\-\*\/\^\%\.\(\)]+$"
+            r"|^\s*(sqrt|cbrt|sin|cos|tan|log|ln|abs|ceil|floor)\s*[\(\s]",
+            r"|\b(square\s+root|cube\s+root|sqrt|cbrt)\s+(of\s+)?[\w\d]",
+            r"|\b(log|ln|sin|cos|tan|abs|ceil|floor)\s+(of\s+)?[\d]",
+            r"|\b\d+(\.\d+)?\s*(plus|minus|times|multiplied\s+by|divided\s+by|over|mod|modulo|to\s+the\s+power)",
+            r"|\b\d+\s+(squared|cubed)\b",
+            r"|^\s*(what\s+is|calculate|compute|evaluate|what'?s|solve)\s+[\d\s\+\-\*\/\^\%\.\(\)]+$"
         ))
         .unwrap()
     })
@@ -62,7 +67,10 @@ pub fn classify(query: &str) -> QueryType {
     if currency_re().is_match(query) {
         return QueryType::CurrencyConversion;
     }
-    if math_re().is_match(query) {
+    // Normalize natural language THEN check for math patterns
+    // e.g. "sqrt of nine" -> "sqrt(9)" -> matches math_re
+    let normalized = normalize_math(query);
+    if math_re().is_match(query) || math_re().is_match(&normalized) {
         return QueryType::Math;
     }
     QueryType::General

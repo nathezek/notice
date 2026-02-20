@@ -24,10 +24,12 @@ function SearchResults() {
     const {
         result,
         resultType,
+        correctedQuery,
         isLoading,
         setLoading,
         setResult,
         setResultType,
+        setCorrectedQuery,
         setHasSearched,
         setInputQuery,
     } = useSearchStore();
@@ -53,6 +55,8 @@ function SearchResults() {
                 const serverResultType = data.result_type as ResultType;
                 setResultType(serverResultType);
 
+                // Store corrected query for banner
+                setCorrectedQuery(data.corrected_query ?? null);
                 let parsedResult;
                 try {
                     parsedResult = JSON.parse(data.content);
@@ -61,19 +65,21 @@ function SearchResults() {
                     console.error("JSON Parse Error:", e);
                     parsedResult = { error: "Failed to parse response" };
                     setResultType("error");
+                    setCorrectedQuery(null);
                 }
 
                 setResult(parsedResult);
             } catch (error) {
                 console.error("Search failed:", error);
                 setResultType("error");
+                setCorrectedQuery(null);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchResults();
-    }, [query, setInputQuery, setHasSearched, setLoading, setResult, setResultType]);
+    }, [query, setInputQuery, setHasSearched, setLoading, setResult, setResultType, setCorrectedQuery]);
 
     const renderResult = () => {
         if (!result || isLoading) return null;
@@ -119,6 +125,22 @@ function SearchResults() {
             >
                 {/* Left Column: Result */}
                 <div className={showSidebar ? "lg:col-span-3" : "w-full max-w-2xl"}>
+                    {/* "Did you mean..." banner */}
+                    {correctedQuery && !isLoading && (
+                        <div className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+                            Showing results for{" "}
+                            <span className="font-medium text-neutral-900 dark:text-neutral-100">{correctedQuery}</span>
+                            {" — Did you mean "}
+                            <button
+                                className="underline underline-offset-2 hover:text-neutral-900 dark:hover:text-neutral-100"
+                                onClick={() => window.location.href = `/search?query=${encodeURIComponent(query ?? "")}`}
+                            >
+                                {query}
+                            </button>
+                            {"?"}
+                        </div>
+                    )}
+
                     {isLoading && <SearchResultSkeleton />}
                     {renderResult()}
                     {!result && !isLoading && !query && (

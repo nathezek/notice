@@ -43,11 +43,13 @@ interface SearchState {
     inputQuery: string;
     result: SearchResult | null;
     resultType: ResultType | null;
+    correctedQuery: string | null;
     isLoading: boolean;
     hasSearched: boolean;
     setInputQuery: (query: string) => void;
     setResult: (result: SearchResult | null) => void;
     setResultType: (type: ResultType | null) => void;
+    setCorrectedQuery: (q: string | null) => void;
     setLoading: (loading: boolean) => void;
     setHasSearched: (val: boolean) => void;
     resetSearch: () => void;
@@ -57,11 +59,13 @@ export const useSearchStore = create<SearchState>((set) => ({
     inputQuery: "",
     result: null,
     resultType: null,
+    correctedQuery: null,
     isLoading: false,
     hasSearched: false,
     setInputQuery: (query) => set({ inputQuery: query }),
     setResult: (result) => set({ result }),
     setResultType: (type) => set({ resultType: type }),
+    setCorrectedQuery: (q) => set({ correctedQuery: q }),
     setLoading: (loading) => set({ isLoading: loading }),
     setHasSearched: (val) => set({ hasSearched: val }),
     resetSearch: () =>
@@ -69,6 +73,7 @@ export const useSearchStore = create<SearchState>((set) => ({
             inputQuery: "",
             result: null,
             resultType: null,
+            correctedQuery: null,
             isLoading: false,
             hasSearched: false,
         }),

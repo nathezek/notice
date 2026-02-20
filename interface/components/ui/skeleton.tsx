@@ -40,3 +40,20 @@ export const SearchResultSkeleton = () => {
         </div>
     );
 };
+
+export const WebsiteListSkeleton = () => {
+    return (
+        <div className="w-full space-y-3">
+            <Skeleton className="mb-4 h-5 w-32" />
+            {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-start gap-3">
+                    <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded-sm" />
+                    <div className="flex-1 space-y-1.5">
+                        <Skeleton className="h-3.5 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};

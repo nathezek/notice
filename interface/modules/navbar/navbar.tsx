@@ -31,7 +31,7 @@ export const Navbar = () => {
         }
     }, [pathname]);
 
-    const handleSearch = async (e?: React.FormEvent) => {
+    const handleSearch = async (e?: React.SubmitEvent) => {
         if (e) e.preventDefault();
         if (!inputQuery.trim()) return;
         router.push(`/search?query=${encodeURIComponent(inputQuery)}`);
@@ -46,12 +46,12 @@ export const Navbar = () => {
 
     return (
         <motion.nav
-            initial={{ height: 0 }}
-            animate={{ height: hasSearched ? 80 : 450 }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: hasSearched ? 80 : 450, opacity: 1 }}
             transition={{
                 type: "spring",
-                stiffness: 100,
-                damping: 20,
+                duration: 1,
+                bounce: 0.3,
             }}
             className="fixed top-0 z-50 flex w-full items-center justify-center overflow-hidden"
         >
@@ -60,15 +60,28 @@ export const Navbar = () => {
                 {!hasSearched && (
                     <motion.div
                         key="home-layout"
-                        className="flex w-full max-w-2xl flex-col items-center justify-center gap-8 px-4"
+                        className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-8"
                         initial={false}
                         exit={{ opacity: 0, transition: { duration: 0.2 } }}
                     >
                         {/* Only the h1 fades in on mount */}
                         <motion.h1
                             initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0, transition: { delay: 0.5, duration: 0.7 } }}
-                            exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
+                            animate={{
+                                opacity: 1,
+                                y: 0,
+                                transition: {
+                                    delay: 0.5,
+                                    type: "spring",
+                                    bounce: 0.2,
+                                    duration: 0.7,
+                                },
+                            }}
+                            exit={{
+                                opacity: 0,
+                                y: -10,
+                                transition: { duration: 0.2 },
+                            }}
                             className="ed-italic cursor-pointer text-6xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
                             onClick={handleLogoClick}
                         >
@@ -89,16 +102,24 @@ export const Navbar = () => {
                 {hasSearched && (
                     <motion.div
                         key="search-layout"
-                        className="flex w-full max-w-5xl items-center px-8"
+                        className="flex w-full items-center justify-between px-8"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1, transition: { duration: 0.3 } }}
                         exit={{ opacity: 0, transition: { duration: 0.15 } }}
                     >
                         {/* Left: small logo — fixed width to balance the right side */}
                         <motion.h1
-                            className="ed-italic w-24 shrink-0 cursor-pointer text-2xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
+                            className="ed-italic w-24 shrink-0 cursor-pointer text-3xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
                             initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0, transition: { duration: 0.35 } }}
+                            animate={{
+                                opacity: 1,
+                                y: 0,
+                                transition: {
+                                    type: "spring",
+                                    stiffness: 120,
+                                    damping: 18,
+                                },
+                            }}
                             onClick={handleLogoClick}
                         >
                             notice

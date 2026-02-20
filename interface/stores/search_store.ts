@@ -1,47 +1,29 @@
 import { create } from "zustand";
 
 // --- Types ---
-export interface WhoResult {
-    type: "who";
-    name: string;
-    lifespan: string;
-    known_for: string;
-    achievements: string[];
-}
-export interface HowResult {
-    type: "how";
-    title: string;
-    difficulty: string;
-    steps: { step: number; instruction: string }[];
-}
-export interface WhatResult {
-    type: "what";
-    concept: string;
-    definition: string;
-    application: string;
-    origin: string;
-}
-export interface WhenResult {
-    type: "when";
-    event: string;
-    date: string;
-    significance: string;
-    timeline: string[];
-}
-export interface WhereResult {
-    type: "where";
-    location: string;
-    region: string;
-    facts: string[];
-    climate: string;
+
+// Old types (keeping for backward compat if needed, or we can just nuke them if we are fully migrating)
+// User wanted flexible "Universal" schema.
+
+export interface UniversalResult {
+    type: "universal"; // We'll tag it 'universal' for now
+    summary: string;
+    facts?: { label: string; value: string }[];
+    related_topics?: string[];
+    widgets?: { type: string; query: string }[];
 }
 
-export type SearchResult =
-    | WhoResult
-    | HowResult
-    | WhatResult
-    | WhenResult
-    | WhereResult;
+// Fallback for old types if backend sends them (optional)
+export interface OldResult {
+    type: "who" | "what" | "how" | "when" | "where";
+    [key: string]: any;
+}
+
+export interface ErrorResult {
+    error: string;
+}
+
+export type SearchResult = UniversalResult | OldResult | ErrorResult;
 
 interface SearchState {
     inputQuery: string;

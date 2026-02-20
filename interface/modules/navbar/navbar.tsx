@@ -1,5 +1,8 @@
 "use client";
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+
 import { motion } from "motion/react";
 import { useSearchStore } from "@/stores/search_store";
 import { QuerySearchForm } from "../forms/query_search_form";
@@ -15,26 +18,30 @@ export const Navbar = () => {
         isLoading,
     } = useSearchStore();
 
-    const hasSearched = isLoading || result !== null;
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+
+    // Determine state based on URL, not just store
+    // Check if we are on the search page
+    const isSearchPage = pathname === "/search";
+    const hasSearched = isSearchPage || isLoading || result !== null;
+
+    useEffect(() => {
+        // If we navigated to root, reset the search state in UI
+        if (pathname === "/") {
+            // optional: reset store?
+            // resetSearch(); 
+        }
+    }, [pathname]);
 
     const handleSearch = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!inputQuery.trim()) return;
-        setLoading(true);
-        setResult(null);
-        try {
-            const response = await fetch("http://localhost:4000/search", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: inputQuery }),
-            });
-            const data = await response.json();
-            setResult(JSON.parse(data.content));
-        } catch (error) {
-            console.error("Search failed:", error);
-        } finally {
-            setLoading(false);
-        }
+
+        // We do not fetch here anymore. We navigate.
+        // The SearchPage will handle the fetch on mount/update.
+        router.push(`/search?query=${encodeURIComponent(inputQuery)}`);
     };
 
     return (
@@ -58,11 +65,10 @@ export const Navbar = () => {
         >
             <motion.div
                 layout
-                className={`flex w-full items-center gap-8 transition-all duration-700 ${
-                    hasSearched
-                        ? "max-w-5xl flex-row justify-between px-8"
-                        : "flex-col justify-center lg:w-2xl"
-                }`}
+                className={`flex w-full items-center gap-8 transition-all duration-700 ${hasSearched
+                    ? "max-w-5xl flex-row justify-between px-8"
+                    : "flex-col justify-center lg:w-2xl"
+                    }`}
             >
                 {/* 2 & 3. sequenced h1 opacity */}
                 <motion.h1

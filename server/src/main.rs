@@ -33,7 +33,7 @@ async fn main() {
 
     let cors = CorsLayer::new()
         // .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap()) // strictly allow only frontend
-        .allow_origin(Any) // For development, we can allow anyone
+        .allow_origin("http://localhost:3000".parse::<axum::http::HeaderValue>().unwrap()) // Allow frontend explicitly
         .allow_methods(Any) // Allow GET, POST, etc.
         .allow_headers(Any); // Allow Content-Type, etc.
 

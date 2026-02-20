@@ -3,6 +3,7 @@ import "./globals.css";
 import ThemesProvider from "@/theme/theme_provider";
 import { Navbar } from "@/modules/navbar/navbar";
 import { AnimatePresence } from "motion/react";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
     title: "Notice",
@@ -19,7 +20,9 @@ export default function RootLayout({
             <body>
                 <ThemesProvider>
                     <AnimatePresence mode="wait">
-                        <Navbar />
+                        <Suspense fallback={null}>
+                            <Navbar />
+                        </Suspense>
                     </AnimatePresence>
                     {children}
                 </ThemesProvider>

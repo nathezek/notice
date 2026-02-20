@@ -21,47 +21,64 @@ struct Part {
     text: String,
 }
 
-pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
+pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>) -> String {
     let client = reqwest::Client::new();
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
         api_key
     );
 
-    let prompt = format!(
-        "You are a smart search engine. Analyze the query and return JSON.
-        Query: '{}'
+    let prompt = if let Some(ctx) = context.filter(|c| !c.is_empty()) {
+        format!(
+            "You are a smart search engine assistant. Based on the scraped web content below, \
+            answer the query with a focused, concise summary.
 
-        Goal: Provide a comprehensive, structured answer using the following FLEXIBLE schema.
-        Do not force the query into a specific 'type' if it doesn't fit.
-        
-        RETURN JSON STRUCTURE:
-        {{
-            \"title\": \"A concise, engaging title for the search result (required)\",
-            \"summary\": \"Markdown text explaining the answer. Use standard markdown headers (e.g., ### Section Title) to separate text. DO NOT use bold text (**text**) for section titles, reserve bolding for inline emphasis within paragraphs.\",
-            
-            \"facts\": [  // Optional: Key attributes if applicable (e.g. for people, places, events)
-                {{ \"label\": \"Born\", \"value\": \"1879\" }},
-                {{ \"label\": \"Height\", \"value\": \"5ft 9in\" }}
-            ],
+            QUERY: '{query}'
 
-            \"related_topics\": [ // Optional: 3-5 related search terms
-                \"Topic 1\", \"Topic 2\" 
-            ],
+            SCRAPED CONTENT:
+            {ctx}
 
-            \"widgets\": [ // Optional: Special display blocks if the query warrants it
-                // Supported types: 'map', 'image'
-                {{ \"type\": \"map\", \"query\": \"Location Name\" }} 
-            ]
-        }}
-        
-        Examples:
-        - Query: 'Who is Elon Musk?' -> title: 'Elon Musk', summary: '...', facts: [{{label: 'Born', value: '...'}}, ...], related_topics: ['Tesla', ...]
-        - Query: 'How to make cake?' -> title: 'How to Make a Cake', summary: '### Ingredients...', facts: [], related_topics: ['Baking', ...]
-        - Query: 'Paris' -> title: 'Paris, France', summary: '...', facts: [{{label: 'Country', value: 'France'}}], widgets: [{{type: 'map', query: 'Paris'}}]
-        ",
-        user_query
-    );
+            --- END OF SCRAPED CONTENT ---
+
+            Instructions:
+            - Extract only the most important facts directly relevant to the query. Do NOT reproduce everything.
+            - Be concise: 2-4 sentences for the summary, plus optional facts/sections if helpful.
+            - Use ### headers only for multiple distinct sections. Prefer flowing prose if 1 topic.
+            - Do not say 'According to the sources' or 'The scraped content says' — write naturally.
+
+            RETURN JSON STRUCTURE:
+            {{
+                \"title\": \"Concise title (required)\",
+                \"summary\": \"Markdown summary — highlight key info, use ### Section if needed\",
+                \"facts\": [ {{ \"label\": \"Key\", \"value\": \"Value\" }} ],
+                \"related_topics\": [ \"Topic 1\", \"Topic 2\" ],
+                \"websites\": [ {{ \"url\": \"https://...\", \"title\": \"Page title\" }} ]
+            }}",
+            query = user_query,
+            ctx = ctx
+        )
+    } else {
+        format!(
+            "You are a smart search engine. Answer the query with a concise, focused response.
+
+            QUERY: '{}'
+
+            Instructions:
+            - Highlight the 3-5 most important facts about this topic.
+            - Be concise: 2-4 sentences or bullet points. Do NOT write a Wikipedia article.
+            - Use ### headers only if there are multiple distinct sections.
+
+            RETURN JSON STRUCTURE:
+            {{
+                \"title\": \"Concise title (required)\",
+                \"summary\": \"Markdown summary — highlight core info\",
+                \"facts\": [ {{ \"label\": \"Key\", \"value\": \"Value\" }} ],
+                \"related_topics\": [ \"Topic 1\", \"Topic 2\" ],
+                \"widgets\": [ {{ \"type\": \"map\", \"query\": \"Location Name\" }} ]
+            }}",
+            user_query
+        )
+    };
 
     let body = GeminiRequest {
         contents: vec![Content {

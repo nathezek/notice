@@ -3,6 +3,7 @@ mod classifier;
 mod currency;
 mod gemini;
 mod spell;
+mod web;
 
 use axum::{Json, Router, extract::State, routing::post};
 use dotenv::dotenv;
@@ -68,7 +69,7 @@ async fn handle_search(
                     }).to_string(),
                     corrected_query: None,
                 }),
-                Err(_) => fallback_to_gemini(query, &state.api_key, None).await,
+                Err(_) => fallback_to_gemini(query, &state.api_key, None, None).await,
             }
         }
 
@@ -93,7 +94,7 @@ async fn handle_search(
                         corrected_query: None,
                     })
                 }
-                None => fallback_to_gemini(query, &state.api_key, None).await,
+                None => fallback_to_gemini(query, &state.api_key, None, None).await,
             }
         }
 
@@ -113,23 +114,28 @@ async fn handle_search(
                 }),
                 Err(e) => {
                     println!("Currency error: {}", e);
-                    fallback_to_gemini(query, &state.api_key, None).await
+                    fallback_to_gemini(query, &state.api_key, None, None).await
                 }
             }
         }
 
-        // ---- General: spell-correct first, then Gemini ----
+        // ---- General: spell-correct, scrape, then Gemini ----
         classifier::QueryType::General => {
             let corrected = spell::correct_query(query);
             let effective = corrected.clone().unwrap_or_default();
             let effective = if effective.is_empty() { query } else { &effective };
-            fallback_to_gemini(effective, &state.api_key, corrected).await
+
+            // Scrape web content concurrently with building the response
+            let context = web::gather_context(effective).await;
+            let context_ref = if context.is_empty() { None } else { Some(context.as_str()) };
+
+            fallback_to_gemini(effective, &state.api_key, corrected, context_ref).await
         }
     }
 }
 
-async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<String>) -> Json<SearchResponse> {
-    let response = gemini::ask_gemini(query, api_key).await;
+async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<String>, context: Option<&str>) -> Json<SearchResponse> {
+    let response = gemini::ask_gemini(query, api_key, context).await;
     Json(SearchResponse {
         result_type: "concept".to_string(),
         content: response,

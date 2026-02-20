@@ -37,7 +37,8 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
         
         RETURN JSON STRUCTURE:
         {{
-            \"summary\": \"Markdown text explaining the answer. use bolding, lists, and clear paragraphs.\",
+            \"title\": \"A concise, engaging title for the search result (required)\",
+            \"summary\": \"Markdown text explaining the answer. Use standard markdown headers (e.g., ### Section Title) to separate text. DO NOT use bold text (**text**) for section titles, reserve bolding for inline emphasis within paragraphs.\",
             
             \"facts\": [  // Optional: Key attributes if applicable (e.g. for people, places, events)
                 {{ \"label\": \"Born\", \"value\": \"1879\" }},
@@ -55,9 +56,9 @@ pub async fn ask_gemini(user_query: &str, api_key: &str) -> String {
         }}
         
         Examples:
-        - Query: 'Who is Elon Musk?' -> summary: '...', facts: [{{label: 'Born', value: '...'}}, ...], related_topics: ['Tesla', ...]
-        - Query: 'How to make cake?' -> summary: 'Markdown recipe...', facts: [], related_topics: ['Baking', ...]
-        - Query: 'Paris' -> summary: '...', facts: [{{label: 'Country', value: 'France'}}], widgets: [{{type: 'map', query: 'Paris'}}]
+        - Query: 'Who is Elon Musk?' -> title: 'Elon Musk', summary: '...', facts: [{{label: 'Born', value: '...'}}, ...], related_topics: ['Tesla', ...]
+        - Query: 'How to make cake?' -> title: 'How to Make a Cake', summary: '### Ingredients...', facts: [], related_topics: ['Baking', ...]
+        - Query: 'Paris' -> title: 'Paris, France', summary: '...', facts: [{{label: 'Country', value: 'France'}}], widgets: [{{type: 'map', query: 'Paris'}}]
         ",
         user_query
     );

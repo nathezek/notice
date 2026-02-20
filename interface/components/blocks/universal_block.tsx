@@ -1,10 +1,11 @@
 "use client";
 
 import { Article } from "@/components/ui/article";
-import { IconMapPin, IconInfoCircle } from "@tabler/icons-react";
+import { IconMapPin } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
 
 export interface UniversalResultData {
+    title: string;
     summary: string;
     facts?: { label: string; value: string }[];
     related_topics?: string[];
@@ -12,13 +13,23 @@ export interface UniversalResultData {
 }
 
 export const UniversalBlock = ({ data }: { data: UniversalResultData }) => {
+    // Convert standalone bold lines to h3 for proper section styling
+    // This prevents section organizers from getting the paragraph "highlight" effect
+    const processedSummary = data.summary.replace(
+        /^[\s]*(?:\*\*|__)(.*?)(?:\*\*|__)(:?)[\s]*$/gm,
+        '### $1$2'
+    );
+
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* 0. Title */}
+            <h1 className="mb-6 text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+                {data.title}
+            </h1>
+
             {/* 1. Main Summary (Article) */}
             <Article>
-                <div className="prose prose-neutral dark:prose-invert max-w-none leading-relaxed text-neutral-800 dark:text-neutral-200">
-                    <ReactMarkdown>{data.summary}</ReactMarkdown>
-                </div>
+                <ReactMarkdown>{processedSummary}</ReactMarkdown>
             </Article>
 
             {/* 2. Facts Grid */}

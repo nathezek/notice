@@ -10,7 +10,11 @@ interface WebsiteModalProps {
     website: WebsiteData | null;
 }
 
-export const WebsiteModal = ({ isOpen, onClose, website }: WebsiteModalProps) => {
+export const WebsiteModal = ({
+    isOpen,
+    onClose,
+    website,
+}: WebsiteModalProps) => {
     if (!website) return null;
 
     return (
@@ -31,17 +35,21 @@ export const WebsiteModal = ({ isOpen, onClose, website }: WebsiteModalProps) =>
                         initial={{ scale: 0.9, opacity: 0, y: 20 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="relative z-10 flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-neutral-900"
+                        transition={{
+                            type: "spring",
+                            damping: 25,
+                            stiffness: 300,
+                        }}
+                        className="relative z-10 flex h-[95vh] w-[95vw] flex-col overflow-hidden rounded-xs bg-white shadow-2xl dark:bg-neutral-900"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-6 py-4 dark:border-neutral-800 dark:bg-neutral-950">
-                            <h2 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
+                        <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-1 dark:border-neutral-800 dark:bg-neutral-950">
+                            <h2 className="text-base font-medium text-neutral-900 dark:text-neutral-100">
                                 {website.title}
                             </h2>
                             <button
                                 onClick={onClose}
-                                className="rounded-full p-2 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                                className="rounded-full p-2 transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-800"
                             >
                                 <IconX size={20} />
                             </button>

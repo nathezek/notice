@@ -1,12 +1,8 @@
 import { create } from "zustand";
 
-// --- Types ---
-
-// Old types (keeping for backward compat if needed, or we can just nuke them if we are fully migrating)
-// User wanted flexible "Universal" schema.
-
 export interface UniversalResult {
-    type: "universal"; // We'll tag it 'universal' for now
+    type: "universal";
+    title: string;
     summary: string;
     facts?: { label: string; value: string }[];
     related_topics?: string[];
@@ -14,16 +10,11 @@ export interface UniversalResult {
 }
 
 // Fallback for old types if backend sends them (optional)
-export interface OldResult {
-    type: "who" | "what" | "how" | "when" | "where";
-    [key: string]: any;
-}
-
 export interface ErrorResult {
     error: string;
 }
 
-export type SearchResult = UniversalResult | OldResult | ErrorResult;
+export type SearchResult = UniversalResult | ErrorResult;
 
 interface SearchState {
     inputQuery: string;

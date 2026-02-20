@@ -2,10 +2,10 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useSearchStore } from "@/stores/search_store";
 import { QuerySearchForm } from "../forms/query_search_form";
+import { ThemeSwitcher } from "@/theme/theme_switcher";
 import React from "react";
 
 export const Navbar = () => {
@@ -22,89 +22,104 @@ export const Navbar = () => {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Determine state based on URL, not just store
-    // Check if we are on the search page
     const isSearchPage = pathname === "/search";
     const hasSearched = isSearchPage || isLoading || result !== null;
 
     useEffect(() => {
-        // If we navigated to root, reset the search state in UI
         if (pathname === "/") {
-            // optional: reset store?
-            // resetSearch(); 
+            // resetSearch(); // optional
         }
     }, [pathname]);
 
     const handleSearch = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!inputQuery.trim()) return;
-
-        // We do not fetch here anymore. We navigate.
-        // The SearchPage will handle the fetch on mount/update.
         router.push(`/search?query=${encodeURIComponent(inputQuery)}`);
+    };
+
+    const handleLogoClick = () => {
+        router.push("/");
+        setInputQuery("");
+        setResult(null);
+        setLoading(false);
     };
 
     return (
         <motion.nav
-            // 1. Slow entrance duration on first load
-            initial={{ height: 0, opacity: 0 }}
-            animate={{
-                height: hasSearched ? 80 : 450,
-                opacity: 1,
-            }}
+            initial={{ height: 0 }}
+            animate={{ height: hasSearched ? 80 : 450 }}
             transition={{
-                height: {
-                    type: "spring",
-                    stiffness: 100,
-                    damping: 20,
-                    duration: 1.5,
-                },
-                opacity: { duration: 1 },
+                type: "spring",
+                stiffness: 100,
+                damping: 20,
             }}
-            className="fixed top-0 z-50 flex w-full items-center justify-center border-b border-neutral-200/0 bg-white/0 backdrop-blur-none dark:border-neutral-800/0 dark:bg-black/0"
+            className="fixed top-0 z-50 flex w-full items-center justify-center overflow-hidden"
         >
-            <motion.div
-                layout
-                className={`flex w-full items-center gap-8 transition-all duration-700 ${hasSearched
-                    ? "max-w-5xl flex-row justify-between px-8"
-                    : "flex-col justify-center lg:w-2xl"
-                    }`}
-            >
-                {/* 2 & 3. sequenced h1 opacity */}
-                <motion.h1
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{
-                        opacity: 1,
-                        fontSize: hasSearched ? "2rem" : "4rem",
-                        marginBottom: hasSearched ? 0 : 32,
-                        // Dip the opacity during the morph
-                        filter: hasSearched ? "blur(0px)" : "blur(0px)",
-                    }}
-                    transition={{
-                        opacity: {
-                            delay: hasSearched ? 0 : 0.8,
-                            duration: 0.8,
-                        },
-                        layout: { duration: 0.8, type: "spring", bounce: 0.2 },
-                        fontSize: { duration: 0.6 },
-                    }}
-                    className="ed-italic font-bold tracking-tighter"
-                >
-                    notice
-                </motion.h1>
+            {/* ---- HOME STATE: Large centered title + form ---- */}
+            <AnimatePresence mode="wait">
+                {!hasSearched && (
+                    <motion.div
+                        key="home-layout"
+                        className="flex w-full max-w-2xl flex-col items-center justify-center gap-8 px-4"
+                        initial={false}
+                        exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                    >
+                        {/* Only the h1 fades in on mount */}
+                        <motion.h1
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0, transition: { delay: 0.5, duration: 0.7 } }}
+                            exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
+                            className="ed-italic cursor-pointer text-6xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
+                            onClick={handleLogoClick}
+                        >
+                            notice
+                        </motion.h1>
 
-                <motion.div
-                    layout
-                    className={hasSearched ? "flex-1" : "w-full"}
-                >
-                    <QuerySearchForm
-                        handleSearch={handleSearch}
-                        inputQuery={inputQuery}
-                        setInputQuery={setInputQuery}
-                    />
-                </motion.div>
-            </motion.div>
+                        <div className="w-full">
+                            <QuerySearchForm
+                                handleSearch={handleSearch}
+                                inputQuery={inputQuery}
+                                setInputQuery={setInputQuery}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+
+                {/* ---- SEARCH STATE: Compact bar ---- */}
+                {hasSearched && (
+                    <motion.div
+                        key="search-layout"
+                        className="flex w-full max-w-5xl items-center px-8"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1, transition: { duration: 0.3 } }}
+                        exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                    >
+                        {/* Left: small logo — fixed width to balance the right side */}
+                        <motion.h1
+                            className="ed-italic w-24 shrink-0 cursor-pointer text-2xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0, transition: { duration: 0.35 } }}
+                            onClick={handleLogoClick}
+                        >
+                            notice
+                        </motion.h1>
+
+                        {/* Center: search form */}
+                        <div className="flex-1 px-4">
+                            <QuerySearchForm
+                                handleSearch={handleSearch}
+                                inputQuery={inputQuery}
+                                setInputQuery={setInputQuery}
+                            />
+                        </div>
+
+                        {/* Right: theme switcher — same fixed width as the logo to keep form centered */}
+                        <div className="flex w-24 shrink-0 justify-end">
+                            <ThemeSwitcher />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.nav>
     );
 };

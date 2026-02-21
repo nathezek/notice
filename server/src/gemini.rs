@@ -1,4 +1,5 @@
 use serde::Serialize;
+use tracing::{error, info, warn};
 
 #[derive(Serialize)]
 struct GeminiRequest {
@@ -28,7 +29,12 @@ Instructions:
 - Use ### headers only for distinct sections.
 - Do not use phrases like 'The text says' or 'According to the source'. Write naturally.";
 
-pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, urls: Vec<String>) -> String {
+pub async fn ask_gemini(
+    user_query: &str,
+    api_key: &str,
+    context: Option<&str>,
+    urls: Vec<String>,
+) -> String {
     let client = reqwest::Client::new();
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
@@ -38,10 +44,10 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
     let prompt = if let Some(ctx) = context.filter(|c| !c.is_empty()) {
         format!(
             "You are a smart search engine assistant. Answer the query based on the content.
-            
+
             QUERY: '{query}'
             CONTENT: {ctx}
-            
+
             {instructions}
 
             RETURN JSON:
@@ -59,9 +65,9 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
     } else {
         format!(
             "You are a smart search engine. Answer concisely.
-            
+
             QUERY: '{query}'
-            
+
             {instructions}
 
             RETURN JSON:
@@ -86,54 +92,80 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
         },
     };
 
-    let response = client.post(url).json(&body).send().await;
+    let mut attempts = 0;
+    let max_attempts = 5;
 
-    match response {
-        Ok(res) => {
-            let status = res.status();
-            if !status.is_success() {
-                if status.as_u16() == 429 {
-                    let mut error_json = serde_json::json!({
-                        "error": "Rate limit exceeded. Try again in 60s."
-                    });
+    while attempts < max_attempts {
+        match client.post(&url).json(&body).send().await {
+            Ok(res) => {
+                let status = res.status();
+                // We MUST read the raw text to see Google's exact complaint
+                let raw_text = res.text().await.unwrap_or_default();
+
+                if status.is_success() {
+                    let json: serde_json::Value =
+                        serde_json::from_str(&raw_text).unwrap_or_default();
+                    let extracted_text = json["candidates"][0]["content"]["parts"][0]["text"]
+                        .as_str()
+                        .unwrap_or("{\"error\": \"Empty response\"}");
+
+                    let clean_text = extracted_text
+                        .trim()
+                        .trim_start_matches("```json")
+                        .trim_start_matches("```")
+                        .trim_end_matches("```");
+
+                    let mut final_json: serde_json::Value = serde_json::from_str(clean_text)
+                        .unwrap_or(serde_json::json!({
+                            "title": "Search Error",
+                            "summary": "AI parsing failed."
+                        }));
+
                     if !urls.is_empty() {
-                        let websites_arr: Vec<serde_json::Value> = urls.into_iter().map(|url| {
-                            serde_json::json!({ "url": url, "title": url })
-                        }).collect();
-                        error_json["websites"] = serde_json::Value::Array(websites_arr);
+                        let websites_arr: Vec<serde_json::Value> = urls
+                            .into_iter()
+                            .map(|url| serde_json::json!({ "url": url, "title": url }))
+                            .collect();
+                        final_json["websites"] = serde_json::Value::Array(websites_arr);
                     }
+
+                    return final_json.to_string();
+                } else if status.as_u16() == 429 {
+                    attempts += 1;
+                    let wait_secs = 2_u64.pow(attempts as u32);
+                    // This log will now show you EXACTLY why Google is rejecting the key
+                    warn!(
+                        "Gemini 429 Rate Limit. Reason: {}. Retrying in {}s (Attempt {}/{})",
+                        raw_text, wait_secs, attempts, max_attempts
+                    );
+                    tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
+                } else {
+                    error!("Gemini API Error Status {}: {}", status, raw_text);
+                    let error_json =
+                        serde_json::json!({ "error": format!("API Error: {}", status) });
                     return error_json.to_string();
                 }
             }
-            let raw_text = res.text().await.unwrap_or_default();
-            let json: serde_json::Value = serde_json::from_str(&raw_text).unwrap_or_default();
-            
-            let extracted_text = json["candidates"][0]["content"]["parts"][0]["text"]
-                .as_str()
-                .unwrap_or("{\"error\": \"Empty response\"}");
-            
-            let clean_text = extracted_text
-                .trim()
-                .trim_start_matches("```json")
-                .trim_start_matches("```")
-                .trim_end_matches("```");
-
-            let mut final_json: serde_json::Value = serde_json::from_str(clean_text).unwrap_or(serde_json::json!({
-                "title": "Search Error",
-                "summary": "AI parsing failed."
-            }));
-
-            if !urls.is_empty() {
-                let websites_arr: Vec<serde_json::Value> = urls.into_iter().map(|url| {
-                    serde_json::json!({ "url": url, "title": url })
-                }).collect();
-                final_json["websites"] = serde_json::Value::Array(websites_arr);
+            Err(e) => {
+                error!("Network Error: {}", e);
+                let error_json = serde_json::json!({ "error": "Network connection failed." });
+                return error_json.to_string();
             }
-
-            final_json.to_string()
         }
-        Err(e) => format!("{{\"error\": \"Network error: {}\"}}", e),
     }
+
+    // If it fails all 5 attempts, fail gracefully on the frontend
+    let mut error_json = serde_json::json!({
+        "error": "Rate limit exceeded. Try again in 60s."
+    });
+    if !urls.is_empty() {
+        let websites_arr: Vec<serde_json::Value> = urls
+            .into_iter()
+            .map(|url| serde_json::json!({ "url": url, "title": url }))
+            .collect();
+        error_json["websites"] = serde_json::Value::Array(websites_arr);
+    }
+    error_json.to_string()
 }
 
 pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
@@ -145,7 +177,7 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
 
     let prompt = format!(
         "You are an expert summarizer. Summarize this page.
-        
+
         TITLE: {title}
         CONTENT: {text}
 
@@ -173,7 +205,7 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
             Ok(res) if res.status().is_success() => {
                 let raw_text = res.text().await.unwrap_or_default();
                 let json: serde_json::Value = serde_json::from_str(&raw_text).unwrap_or_default();
-                
+
                 return json["candidates"][0]["content"]["parts"][0]["text"]
                     .as_str()
                     .unwrap_or("Failed to generate summary.")
@@ -183,7 +215,11 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
             Ok(res) if res.status().as_u16() == 429 => {
                 attempts += 1;
                 let wait_secs = 5 + attempts;
-                tracing::warn!("Gemini 429 Rate Limit hit. Retrying in {}s (Attempt {}/5)", wait_secs, attempts);
+                tracing::warn!(
+                    "Gemini 429 Rate Limit hit. Retrying in {}s (Attempt {}/5)",
+                    wait_secs,
+                    attempts
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
             }
             Ok(res) => {

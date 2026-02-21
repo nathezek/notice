@@ -1,4 +1,5 @@
 use scraper::{Html, Selector};
+use tracing::{info, error, debug};
 
 const MAX_CONTEXT_CHARS: usize = 1500; // Per page limit
 const MAX_PAGES: usize = 2;
@@ -65,16 +66,40 @@ pub async fn search(query: &str) -> Vec<String> {
 
 // ---- Page Scraper ----
 
-pub async fn scrape(url: &str) -> Option<String> {
-    let client = reqwest::Client::builder()
+pub async fn scrape(url: &str) -> (Option<String>, Option<String>) {
+    info!("Starting scrape for URL: {}", url);
+    let client = match reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
         .timeout(std::time::Duration::from_secs(4))
-        .build()
-        .ok()?;
+        .build() {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Failed to build reqwest client: {}", e);
+                return (None, None);
+            }
+        };
 
-    let html = client.get(url).send().await.ok()?.text().await.ok()?;
+    let html = match client.get(url).send().await {
+        Ok(res) => match res.text().await {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Failed to read text from {}: {}", url, e);
+                return (None, None);
+            }
+        },
+        Err(e) => {
+            error!("Failed to fetch URL {}: {}", url, e);
+            return (None, None);
+        }
+    };
 
     let document = Html::parse_document(&html);
+
+    // Extract Title
+    let title_sel = Selector::parse("title").unwrap();
+    let title = document.select(&title_sel).next().map(|el| el.text().collect::<String>().trim().to_string());
+    
+    debug!("Extracted title {:?} for URL {}", title, url);
 
     // Remove script, style, nav, footer, header noise
     let content_sel = Selector::parse(
@@ -92,7 +117,8 @@ pub async fn scrape(url: &str) -> Option<String> {
         .join("\n");
 
     if text.is_empty() {
-        return None;
+        info!("No significant text found for URL: {}", url);
+        return (title, None);
     }
 
     // Truncate to limit
@@ -102,7 +128,8 @@ pub async fn scrape(url: &str) -> Option<String> {
         text
     };
 
-    Some(truncated)
+    info!("Successfully scraped {} bytes from URL: {}", truncated.len(), url);
+    (title, Some(truncated))
 }
 
 // ---- Context Builder ----
@@ -124,7 +151,7 @@ pub async fn gather_context(query: &str) -> (Vec<String>, String) {
 
     let mut context_parts: Vec<String> = Vec::new();
     for task in tasks {
-        if let Ok(Some(content)) = task.await {
+        if let Ok((_title, Some(content))) = task.await {
             context_parts.push(content);
         }
     }

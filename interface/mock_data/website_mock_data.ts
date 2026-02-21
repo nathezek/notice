@@ -17,7 +17,7 @@ export const MOCK_WEBSITES: WebsiteData[] = [
     {
         id: "2",
         title: "MDN Web Docs",
-        url: "https://developer.mozilla.org",
+        url: "https://developer.mozilla.org/en-US/",
         snippet: "The MDN Web Docs site provides information about Open Web technologies including HTML, CSS, and APIs for both Web sites and progressive web apps.",
         imageUrl: "https://developer.mozilla.org/mdn-social-share.cd6c4a5a.png"
     },

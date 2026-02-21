@@ -64,7 +64,7 @@ export const WebsiteList = ({ websites, onWebsiteClick }: WebsiteListProps) => {
                                     <div className="absolute top-4 right-1.5 h-3 w-3 rotate-45 border-t border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950" />
 
                                     <div className="overflow-hidden rounded-lg">
-                                        <div className="h-32 w-full bg-neutral-100 dark:bg-neutral-800">
+                                        <div className="relative h-32 w-full bg-neutral-100 dark:bg-neutral-800">
                                             {/* Ideally real screenshot, using placeholder or mock image */}
                                             <Image
                                                 src={

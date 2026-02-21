@@ -2,7 +2,16 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { useSearchStore, ResultType } from "@/stores/search_store";
+import {
+    useSearchStore,
+    ResultType,
+    UniversalResult,
+    MathResult,
+    UnitResult,
+    CurrencyResult,
+    TimerResult,
+    Website,
+} from "@/stores/search_store";
 import { UniversalBlock } from "@/components/blocks/universal_block";
 import { CalculatorBlock } from "@/components/blocks/calculator_block";
 import { ConverterBlock } from "@/components/blocks/converter_block";
@@ -14,21 +23,28 @@ import { WebsiteModal } from "@/components/website/website_modal";
 import { IndexerComponent } from "@/components/indexer/indexer";
 
 import { Suspense } from "react";
-import { SearchResultSkeleton, WebsiteListSkeleton } from "@/components/ui/skeleton";
+import {
+    SearchResultSkeleton,
+    WebsiteListSkeleton,
+} from "@/components/ui/skeleton";
 import { motion } from "motion/react";
 
 function SearchResults() {
     const searchParams = useSearchParams();
     const query = searchParams.get("query");
 
-    const [selectedWebsite, setSelectedWebsite] = useState<WebsiteData | null>(null);
+    const [selectedWebsite, setSelectedWebsite] = useState<WebsiteData | null>(
+        null,
+    );
 
     const {
         result,
         resultType,
         correctedQuery,
         isLoading,
+        isSummaryLoading,
         setLoading,
+        setSummaryLoading,
         setResult,
         setResultType,
         setCorrectedQuery,
@@ -49,43 +65,88 @@ function SearchResults() {
         const fetchResults = async () => {
             setLoading(true);
             try {
-                const response = await fetch("http://localhost:4000/search", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query }),
-                });
+                // Step A: Fast Web Search (/search/web)
+                const response = await fetch(
+                    "http://localhost:4000/search/web",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ query }),
+                    },
+                );
                 const data = await response.json();
-                console.log("Raw Server Response:", data);
+                console.log("Web Search Response:", data);
 
-                // Store the result_type so we know which block to render
                 const serverResultType = data.result_type as ResultType;
                 setResultType(serverResultType);
-
-                // Store corrected query for banner
                 setCorrectedQuery(data.corrected_query ?? null);
+
                 let parsedResult;
                 try {
                     parsedResult = JSON.parse(data.content);
-                    console.log("Parsed Result:", parsedResult);
                 } catch (e) {
                     console.error("JSON Parse Error:", e);
                     parsedResult = { error: "Failed to parse response" };
                     setResultType("error");
                     setCorrectedQuery(null);
                 }
-
                 setResult(parsedResult);
+                setLoading(false);
+
+                // Step B: Background AI Summary (/search/summary)
+                // Only for "concept" results where we need an AI summary
+                if (serverResultType === "concept") {
+                    setSummaryLoading(true);
+                    try {
+                        const summaryResponse = await fetch(
+                            "http://localhost:4000/search/summary",
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    query,
+                                    urls:
+                                        parsedResult.websites?.map(
+                                            (w: Website) => w.url,
+                                        ) || [],
+                                }),
+                            },
+                        );
+                        const summaryData = await summaryResponse.json();
+                        console.log("Summary Response:", summaryData);
+
+                        const freshResult = JSON.parse(summaryData.content);
+                        // Merge with initial parsedResult to ensure websites are preserved
+                        // if Gemini fails to return them or returns an error.
+                        setResult({
+                            ...(parsedResult as UniversalResult),
+                            ...freshResult,
+                        });
+                    } catch (summaryError) {
+                        console.error("Summary fetch failed:", summaryError);
+                    } finally {
+                        setSummaryLoading(false);
+                    }
+                }
             } catch (error) {
                 console.error("Search failed:", error);
                 setResultType("error");
                 setCorrectedQuery(null);
-            } finally {
                 setLoading(false);
             }
         };
 
         fetchResults();
-    }, [query, setInputQuery, setHasSearched, setLoading, setResult, setResultType, setCorrectedQuery]);
+    }, [
+        query,
+        setInputQuery,
+        setHasSearched,
+        setLoading,
+        setSummaryLoading,
+        setResult,
+        setResultType,
+        setCorrectedQuery,
+    ]);
 
     const renderResult = () => {
         if (!result || isLoading) return null;
@@ -93,9 +154,14 @@ function SearchResults() {
         if ("error" in result) {
             return (
                 <div className="serif-font flex flex-col items-center justify-center">
-                    <span className="text-9xl font-sans my-8 text-center text-neutral-700 dark:text-neutral-200">\(^Д^)/</span>
+                    <span className="my-8 text-center font-sans text-9xl text-neutral-700 dark:text-neutral-200">
+                        \(^Д^)/
+                    </span>
 
-                    <h3 className="mb-2 text-center text-normal tracking-[0.015rem] leading-relaxed w-96 text-lg opacity-80">It appears that we a currently unable to process your request, would you mind refreshing the page?</h3>
+                    <h3 className="text-normal mb-2 w-96 text-center text-lg leading-relaxed tracking-[0.015rem] opacity-80">
+                        It appears that we a currently unable to process your
+                        request, would you mind refreshing the page?
+                    </h3>
                     <p className="text-center text-sm">{result.error}</p>
                 </div>
             );
@@ -103,16 +169,40 @@ function SearchResults() {
 
         switch (resultType) {
             case "math":
-                return <CalculatorBlock data={result as any} />;
+                return <CalculatorBlock data={result as MathResult} />;
             case "unit_conversion":
-                return <ConverterBlock type="unit_conversion" data={result as any} />;
+                return (
+                    <ConverterBlock
+                        type="unit_conversion"
+                        data={result as UnitResult}
+                    />
+                );
             case "currency_conversion":
-                return <ConverterBlock type="currency_conversion" data={result as any} />;
+                return (
+                    <ConverterBlock
+                        type="currency_conversion"
+                        data={result as CurrencyResult}
+                    />
+                );
             case "timer":
-                return <TimerBlock data={result as any} />;
+                return <TimerBlock data={result as TimerResult} />;
             case "concept":
             default:
-                return <UniversalBlock data={result as any} />;
+                return (
+                    <div className="relative">
+                        <UniversalBlock data={result as UniversalResult} />
+                        {isSummaryLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm transition-opacity duration-300 dark:bg-neutral-900/50">
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-neutral-800 dark:border-neutral-700 dark:border-t-neutral-200"></div>
+                                    <p className="animate-pulse text-sm font-medium">
+                                        Summarizing web results...
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
         }
     };
 
@@ -134,16 +224,24 @@ function SearchResults() {
                 transition={{ delay: 0.55, duration: 0.5, ease: "easeOut" }}
             >
                 {/* Left Column: Result */}
-                <div className={showSidebar ? "lg:col-span-2" : "w-full max-w-2xl"}>
+                <div
+                    className={
+                        showSidebar ? "lg:col-span-2" : "w-full max-w-2xl"
+                    }
+                >
                     {/* "Did you mean..." banner */}
                     {correctedQuery && !isLoading && (
                         <div className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
                             Showing results for{" "}
-                            <span className="font-medium text-neutral-900 dark:text-neutral-100">{correctedQuery}</span>
+                            <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                                {correctedQuery}
+                            </span>
                             {" — Did you mean "}
                             <button
                                 className="underline underline-offset-2 hover:text-neutral-900 dark:hover:text-neutral-100"
-                                onClick={() => window.location.href = `/search?query=${encodeURIComponent(query ?? "")}`}
+                                onClick={() =>
+                                    (window.location.href = `/search?query=${encodeURIComponent(query ?? "")}`)
+                                }
                             >
                                 {query}
                             </button>
@@ -168,17 +266,27 @@ function SearchResults() {
                                 <WebsiteListSkeleton />
                             ) : (
                                 <div className="flex flex-col gap-8">
-                                    <IndexerComponent />
+                                    {/*<IndexerComponent />*/}
                                     <WebsiteList
                                         websites={
-                                            result && "websites" in result && Array.isArray(result.websites) && result.websites.length > 0
-                                                ? result.websites.map((w: any, idx: number) => ({
-                                                    id: `site-${idx}`,
-                                                    url: w.url,
-                                                    title: w.title,
-                                                    snippet: w.snippet || new URL(w.url).hostname,
-                                                    imageUrl: w.imageUrl || `https://image.thum.io/get/width/400/crop/800/noanimate/${w.url}`
-                                                }))
+                                            result &&
+                                                "websites" in result &&
+                                                Array.isArray(result.websites) &&
+                                                result.websites.length > 0
+                                                ? (result as UniversalResult).websites!.map(
+                                                    (w, idx: number) => ({
+                                                        id: `site-${idx}`,
+                                                        url: w.url,
+                                                        title: w.title,
+                                                        snippet:
+                                                            w.snippet ||
+                                                            new URL(w.url)
+                                                                .hostname,
+                                                        imageUrl:
+                                                            w.imageUrl ||
+                                                            `https://image.thum.io/get/width/400/crop/800/noanimate/${w.url}`,
+                                                    }),
+                                                )
                                                 : MOCK_WEBSITES
                                         }
                                         onWebsiteClick={setSelectedWebsite}

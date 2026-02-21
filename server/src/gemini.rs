@@ -93,7 +93,16 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
             let status = res.status();
             if !status.is_success() {
                 if status.as_u16() == 429 {
-                    return r#"{"error": "Rate limit exceeded. Try again in 60s."}"#.to_string();
+                    let mut error_json = serde_json::json!({
+                        "error": "Rate limit exceeded. Try again in 60s."
+                    });
+                    if !urls.is_empty() {
+                        let websites_arr: Vec<serde_json::Value> = urls.into_iter().map(|url| {
+                            serde_json::json!({ "url": url, "title": url })
+                        }).collect();
+                        error_json["websites"] = serde_json::Value::Array(websites_arr);
+                    }
+                    return error_json.to_string();
                 }
             }
             let raw_text = res.text().await.unwrap_or_default();

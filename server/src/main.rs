@@ -21,6 +21,12 @@ struct SearchRequest {
 }
 
 #[derive(Deserialize)]
+struct SearchSummaryRequest {
+    query: String,
+    urls: Vec<String>,
+}
+
+#[derive(Deserialize)]
 struct CalculateRequest {
     expression: String,
 }
@@ -79,7 +85,8 @@ async fn main() {
         .allow_headers(Any);
 
     let app = Router::new()
-        .route("/search", post(handle_search))
+        .route("/search/web", post(handle_search_web))
+        .route("/search/summary", post(handle_search_summary))
         .route("/calculate", post(handle_calculate))
         .route("/index-url", post(handle_index_url))
         .layer(cors)
@@ -90,7 +97,7 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn handle_search(
+async fn handle_search_web(
     State(state): State<AppState>,
     Json(payload): Json<SearchRequest>,
 ) -> Json<SearchResponse> {
@@ -248,15 +255,57 @@ async fn handle_search(
 
             let corrected = spell::correct_query(query);
             let effective = corrected.clone().unwrap_or_default();
-            let effective = if effective.is_empty() { query } else { &effective };
+            let effective_str = if effective.is_empty() { query } else { &effective };
 
-            // Scrape web content concurrently with building the response
-            let (urls, context) = web::gather_context(effective).await;
-            let context_ref = if context.is_empty() { None } else { Some(context.as_str()) };
-
-            fallback_to_gemini(effective, &state, corrected, context_ref, urls).await
+            // For the fast path, we just search DuckDuckGo and return the URLs.
+            // We don't call Gemini yet.
+            let urls = web::search(effective_str).await;
+            
+            Json(SearchResponse {
+                result_type: "concept".to_string(),
+                content: serde_json::json!({
+                    "title": effective_str,
+                    "summary": "",
+                    "facts": [],
+                    "related_topics": [],
+                    "websites": urls.iter().map(|u| serde_json::json!({ "url": u, "title": u })).collect::<Vec<_>>()
+                }).to_string(),
+                corrected_query: corrected,
+            })
         }
     }
+}
+
+async fn handle_search_summary(
+    State(state): State<AppState>,
+    Json(payload): Json<SearchSummaryRequest>,
+) -> Json<SearchResponse> {
+    let query = &payload.query;
+    let urls = payload.urls;
+
+    // Fast path for summary: if we have URLs, scrape them concurrently and ask Gemini
+    let (found_urls, context) = if urls.is_empty() {
+        web::gather_context(query).await
+    } else {
+        // Scrape the provided URLs
+        let scrape_urls = urls.clone();
+        let tasks: Vec<_> = scrape_urls
+            .into_iter()
+            .take(2) // MAX_PAGES
+            .map(|url| tokio::spawn(async move { web::scrape(&url).await }))
+            .collect();
+
+        let mut context_parts: Vec<String> = Vec::new();
+        for task in tasks {
+            if let Ok((_title, Some(content))) = task.await {
+                context_parts.push(content);
+            }
+        }
+        (urls, context_parts.join("\n\n---\n\n"))
+    };
+
+    let context_ref = if context.is_empty() { None } else { Some(context.as_str()) };
+    fallback_to_gemini(query, &state, None, context_ref, found_urls).await
 }
 
 async fn fallback_to_gemini(

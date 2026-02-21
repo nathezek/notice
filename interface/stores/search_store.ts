@@ -1,5 +1,12 @@
 import { create } from "zustand";
 
+export interface Website {
+    url: string;
+    title: string;
+    snippet?: string;
+    imageUrl?: string;
+}
+
 export interface UniversalResult {
     type: "universal";
     title: string;
@@ -7,7 +14,7 @@ export interface UniversalResult {
     facts?: { label: string; value: string }[];
     related_topics?: string[];
     widgets?: { type: string; query: string }[];
-    websites?: { url: string; title: string; snippet?: string; imageUrl?: string }[];
+    websites?: Website[];
 }
 
 export interface MathResult {
@@ -51,12 +58,14 @@ interface SearchState {
     resultType: ResultType | null;
     correctedQuery: string | null;
     isLoading: boolean;
+    isSummaryLoading: boolean;
     hasSearched: boolean;
     setInputQuery: (query: string) => void;
     setResult: (result: SearchResult | null) => void;
     setResultType: (type: ResultType | null) => void;
     setCorrectedQuery: (q: string | null) => void;
     setLoading: (loading: boolean) => void;
+    setSummaryLoading: (loading: boolean) => void;
     setHasSearched: (val: boolean) => void;
     resetSearch: () => void;
 }
@@ -67,12 +76,14 @@ export const useSearchStore = create<SearchState>((set) => ({
     resultType: null,
     correctedQuery: null,
     isLoading: false,
+    isSummaryLoading: false,
     hasSearched: false,
     setInputQuery: (query) => set({ inputQuery: query }),
     setResult: (result) => set({ result }),
     setResultType: (type) => set({ resultType: type }),
     setCorrectedQuery: (q) => set({ correctedQuery: q }),
     setLoading: (loading) => set({ isLoading: loading }),
+    setSummaryLoading: (loading) => set({ isSummaryLoading: loading }),
     setHasSearched: (val) => set({ hasSearched: val }),
     resetSearch: () =>
         set({
@@ -81,6 +92,7 @@ export const useSearchStore = create<SearchState>((set) => ({
             resultType: null,
             correctedQuery: null,
             isLoading: false,
+            isSummaryLoading: false,
             hasSearched: false,
         }),
 }));

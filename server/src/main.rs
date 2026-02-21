@@ -66,6 +66,18 @@ async fn handle_search(
     match classifier::classify(query) {
         // ---- Math: evaluate expression directly ----
         classifier::QueryType::Math => {
+            let bare_math_re = regex::Regex::new(r"^\s*(?i)(calculator|calc)\s*$").unwrap();
+            if bare_math_re.is_match(query) {
+                return Json(SearchResponse {
+                    result_type: "math".to_string(),
+                    content: serde_json::json!({
+                        "expression": "0",
+                        "result": "0"
+                    }).to_string(),
+                    corrected_query: None,
+                });
+            }
+
             match calculator::eval_math(query) {
                 Ok(result) => Json(SearchResponse {
                     result_type: "math".to_string(),
@@ -106,7 +118,14 @@ async fn handle_search(
 
         // ---- Currency conversion ----
         classifier::QueryType::CurrencyConversion => {
-            match currency::convert_currency(query).await {
+            let bare_currency_re = regex::Regex::new(r"^\s*(?i)(converter|currency converter|exchange rates|exchange rate)\s*$").unwrap();
+            let actual_query = if bare_currency_re.is_match(query) {
+                "1 USD to EUR"
+            } else {
+                query
+            };
+
+            match currency::convert_currency(actual_query).await {
                 Ok(r) => Json(SearchResponse {
                     result_type: "currency_conversion".to_string(),
                     content: serde_json::json!({
@@ -127,6 +146,18 @@ async fn handle_search(
 
         // ---- Timer ----
         classifier::QueryType::Timer => {
+            let bare_timer_re = regex::Regex::new(r"^\s*(?i)(timer|stopwatch)\s*$").unwrap();
+            if bare_timer_re.is_match(query) {
+                return Json(SearchResponse {
+                    result_type: "timer".to_string(),
+                    content: serde_json::json!({
+                        "seconds": 300,
+                        "query": "5 Minute Timer"
+                    }).to_string(),
+                    corrected_query: None,
+                });
+            }
+
             let re = regex::Regex::new(r"(?i)(\d+(?:\.\d+)?)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)").unwrap();
             let mut total_seconds: f64 = 0.0;
             for cap in re.captures_iter(query) {

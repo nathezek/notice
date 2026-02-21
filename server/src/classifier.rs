@@ -8,9 +8,6 @@ use crate::calculator::normalize_math;
 fn math_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        // Symbolic: "2 + 2", "(100*3)/4"
-        // Natural: "square root of 9", "sqrt of nine", "9 squared", "5 plus 3"
-        // "what is 10 divided by 2", "calculate 50 mod 7"
         Regex::new(concat!(
             r"(?i)^\s*[\d\s\.\+\-\*\/\^\%\(\)]+$",
             r"|^\s*(sqrt|cbrt|sin|cos|tan|log|ln|abs|ceil|floor)\s*[\(\s]",
@@ -18,7 +15,8 @@ fn math_re() -> &'static Regex {
             r"|\b(log|ln|sin|cos|tan|abs|ceil|floor)\s+(of\s+)?[\d]",
             r"|\b\d+(\.\d+)?\s*(plus|minus|times|multiplied\s+by|divided\s+by|over|mod|modulo|to\s+the\s+power)",
             r"|\b\d+\s+(squared|cubed)\b",
-            r"|^\s*(what\s+is|calculate|compute|evaluate|what'?s|solve)\s+[\d\s\+\-\*\/\^\%\.\(\)]+$"
+            r"|^\s*(what\s+is|calculate|compute|evaluate|what'?s|solve)\s+[\d\s\+\-\*\/\^\%\.\(\)]+$",
+            r"|^\s*(?i)(calculator|calc)\s*$"
         ))
         .unwrap()
     })
@@ -38,10 +36,11 @@ fn unit_re() -> &'static Regex {
 fn currency_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        // Requires uppercase ISO-4217 codes (USD, ETB, EUR) — no (?i) on code groups
-        // so unit abbreviations like mph/kph won't accidentally match
         Regex::new(
-            r"\b\d+(?:\.\d+)?\s*([A-Z]{3})\b.{0,15}\b(?i:to|in|into|as)\b\s*([A-Z]{3})\b",
+            concat!(
+                r"\b\d+(?:\.\d+)?\s*([A-Z]{3})\b.{0,15}\b(?i:to|in|into|as)\b\s*([A-Z]{3})\b",
+                r"|^\s*(?i)(converter|currency converter|exchange rates|exchange rate)\s*$"
+            )
         )
         .unwrap()
     })
@@ -51,7 +50,10 @@ fn timer_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
         Regex::new(
-            r"(?i)^(?:set a |start a |create a )?timer (?:for )?\d+(?:\.\d+)?\s*(?:s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b"
+            concat!(
+                r"(?i)^(?:set a |start a |create a )?timer (?:for )?\d+(?:\.\d+)?\s*(?:s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b",
+                r"|^\s*(?i)(timer|stopwatch)\s*$"
+            )
         ).unwrap()
     })
 }

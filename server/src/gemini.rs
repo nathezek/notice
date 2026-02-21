@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tracing::{error, info, warn};
+use tracing;
 
 #[derive(Serialize)]
 struct GeminiRequest {
@@ -134,20 +134,23 @@ pub async fn ask_gemini(
                     attempts += 1;
                     let wait_secs = 2_u64.pow(attempts as u32);
                     // This log will now show you EXACTLY why Google is rejecting the key
-                    warn!(
+                    tracing::warn!(
                         "Gemini 429 Rate Limit. Reason: {}. Retrying in {}s (Attempt {}/{})",
-                        raw_text, wait_secs, attempts, max_attempts
+                        raw_text,
+                        wait_secs,
+                        attempts,
+                        max_attempts
                     );
                     tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
                 } else {
-                    error!("Gemini API Error Status {}: {}", status, raw_text);
+                    tracing::error!("Gemini API Error Status {}: {}", status, raw_text);
                     let error_json =
                         serde_json::json!({ "error": format!("API Error: {}", status) });
                     return error_json.to_string();
                 }
             }
             Err(e) => {
-                error!("Network Error: {}", e);
+                tracing::error!("Network Error: {}", e);
                 let error_json = serde_json::json!({ "error": "Network connection failed." });
                 return error_json.to_string();
             }
@@ -206,11 +209,19 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
                 let raw_text = res.text().await.unwrap_or_default();
                 let json: serde_json::Value = serde_json::from_str(&raw_text).unwrap_or_default();
 
-                return json["candidates"][0]["content"]["parts"][0]["text"]
+                let content = json["candidates"][0]["content"]["parts"][0]["text"]
                     .as_str()
                     .unwrap_or("Failed to generate summary.")
                     .trim()
                     .to_string();
+
+                // ADD THIS LOG:
+                tracing::info!(
+                    "Successfully generated Gemini summary ({} bytes)",
+                    content.len()
+                );
+
+                return content;
             }
             Ok(res) if res.status().as_u16() == 429 => {
                 attempts += 1;

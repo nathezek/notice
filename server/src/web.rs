@@ -207,9 +207,14 @@ pub async fn scrape(url: &str) -> (Option<String>, Option<String>) {
         return (title, None);
     }
 
-    // Truncate to limit
-    let truncated = if text.len() > MAX_CONTEXT_CHARS {
-        format!("{}...", &text[..MAX_CONTEXT_CHARS])
+    // Safe truncation to limit
+    let truncated = if text.chars().count() > MAX_CONTEXT_CHARS {
+        let mut truncated = String::new();
+        for c in text.chars().take(MAX_CONTEXT_CHARS) {
+            truncated.push(c);
+        }
+        truncated.push_str("...");
+        truncated
     } else {
         text
     };
@@ -247,4 +252,32 @@ pub async fn gather_context(query: &str) -> (Vec<String>, String) {
     }
 
     (urls, context_parts.join("\n\n---\n\n"))
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_safe_truncation() {
+        let text = "Hello 🦀 World";
+        let max = 7;
+        let truncated = if text.chars().count() > max {
+            text.chars().take(max).collect::<String>() + "..."
+        } else {
+            text.to_string()
+        };
+        assert_eq!(truncated, "Hello 🦀...");
+    }
+
+    #[test]
+    fn test_no_truncation_needed() {
+        let text = "Short";
+        let max = 10;
+        let truncated = if text.chars().count() > max {
+            text.chars().take(max).collect::<String>() + "..."
+        } else {
+            text.to_string()
+        };
+        assert_eq!(truncated, "Short");
+    }
 }

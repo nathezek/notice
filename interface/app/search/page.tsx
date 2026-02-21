@@ -96,6 +96,17 @@ function SearchResults() {
                 // Step B: Background AI Summary (/search/summary)
                 // Only for "concept" results where we need an AI summary
                 if (serverResultType === "concept") {
+                    if (
+                        parsedResult.summary &&
+                        parsedResult.summary.trim().length > 0
+                    ) {
+                        console.log(
+                            "Summary already cached, skipping AI generation.",
+                        );
+                        setSummaryLoading(false); // Ensure overlay is hidden
+                        return;
+                    }
+
                     setSummaryLoading(true);
                     try {
                         const summaryResponse = await fetch(

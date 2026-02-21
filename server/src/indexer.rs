@@ -12,26 +12,33 @@ pub struct IndexDocument {
 
 pub async fn init_indexer(url: &str, api_key: Option<&str>) -> Client {
     let client = Client::new(url, api_key).expect("Meilisearch Client initialization failed");
-    
+
     // Ensure the index exists
     let _ = client.create_index("pages", Some("id")).await;
-    
+
     client
 }
 
-pub async fn index_page(client: &Client, doc: &IndexDocument) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn index_page(
+    client: &Client,
+    doc: &IndexDocument,
+) -> Result<(), Box<dyn std::error::Error>> {
     let index = client.index("pages");
-    
+
     // Add or replace the document in the 'pages' index
     index.add_documents(&[doc], Some("id")).await?;
-    
+
     Ok(())
 }
 
-pub async fn search_index(client: &Client, query: &str) -> Result<Vec<IndexDocument>, Box<dyn std::error::Error>> {
+pub async fn search_index(
+    client: &Client,
+    query: &str,
+) -> Result<Vec<IndexDocument>, Box<dyn std::error::Error>> {
     let index = client.index("pages");
-    
-    let results = index.search()
+
+    let results = index
+        .search()
         .with_query(query)
         .with_limit(3)
         .execute::<IndexDocument>()
@@ -39,4 +46,13 @@ pub async fn search_index(client: &Client, query: &str) -> Result<Vec<IndexDocum
 
     let hits = results.hits.into_iter().map(|hit| hit.result).collect();
     Ok(hits)
+}
+
+pub async fn get_document_by_id(client: &Client, id: &str) -> Option<IndexDocument> {
+    let index = client.index("pages");
+    // Directly fetch the document by its unique hash ID
+    match index.get_document::<IndexDocument>(id).await {
+        Ok(doc) => Some(doc),
+        Err(_) => None,
+    }
 }

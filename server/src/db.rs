@@ -66,7 +66,7 @@ pub async fn insert_page(pool: &DbPool, page: &PageData) -> sqlx::Result<()> {
 }
 
 pub async fn get_page(pool: &DbPool, url: &str) -> sqlx::Result<Option<PageData>> {
-    let row = sqlx::query_as::<_, PageData>(
+    let row = sqlx::query_as::<Postgres, PageData>(
         r#"
         SELECT url, title, raw_html, cleaned_text, summary, crawled_at
         FROM pages

@@ -21,6 +21,13 @@ struct Part {
     text: String,
 }
 
+const PROMPT_INSTRUCTIONS: &str = "
+Instructions:
+- Extract and summarize the most important facts. Be concise (2-4 sentences).
+- EXTENSIVELY use **bold text** to highlight key names, dates, amounts, and critical concepts.
+- Use ### headers only for distinct sections.
+- Do not use phrases like 'The text says' or 'According to the source'. Write naturally.";
+
 pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, urls: Vec<String>) -> String {
     let client = reqwest::Client::new();
     let url = format!(
@@ -30,55 +37,43 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
 
     let prompt = if let Some(ctx) = context.filter(|c| !c.is_empty()) {
         format!(
-            "You are a smart search engine assistant. Based on the scraped web content below, \
-            answer the query with a focused, concise summary.
-
+            "You are a smart search engine assistant. Answer the query based on the content.
+            
             QUERY: '{query}'
+            CONTENT: {ctx}
+            
+            {instructions}
 
-            SCRAPED CONTENT:
-            {ctx}
-
-            --- END OF SCRAPED CONTENT ---
-
-            Instructions:
-            - Extract only the most important facts directly relevant to the query. Do NOT reproduce everything.
-            - Be concise: 2-4 sentences for the summary, plus optional facts/sections if helpful.
-            - EXTENSIVELY use **bold text** to highlight key names, dates, and important concepts in the summary.
-            - Use ### headers only for multiple distinct sections. Prefer flowing prose if 1 topic.
-            - Do not say 'According to the sources' or 'The scraped content says' — write naturally.
-
-            RETURN JSON STRUCTURE:
+            RETURN JSON:
             {{
-                \"title\": \"Concise title (required)\",
-                \"summary\": \"Markdown summary — highlight key info, use ### Section if needed\",
+                \"title\": \"Title\",
+                \"summary\": \"Markdown summary\",
                 \"facts\": [ {{ \"label\": \"Key\", \"value\": \"Value\" }} ],
-                \"related_topics\": [ \"Topic 1\", \"Topic 2\" ],
-                \"websites\": [ {{ \"url\": \"https://...\", \"title\": \"Page title\" }} ]
+                \"related_topics\": [ \"Topic\" ],
+                \"websites\": [ {{ \"url\": \"url\", \"title\": \"title\" }} ]
             }}",
             query = user_query,
-            ctx = ctx
+            ctx = ctx,
+            instructions = PROMPT_INSTRUCTIONS
         )
     } else {
         format!(
-            "You are a smart search engine. Answer the query with a concise, focused response.
+            "You are a smart search engine. Answer concisely.
+            
+            QUERY: '{query}'
+            
+            {instructions}
 
-            QUERY: '{}'
-
-            Instructions:
-            - Highlight the 3-5 most important facts about this topic.
-            - Be concise: 2-4 sentences or bullet points. Do NOT write a Wikipedia article.
-            - EXTENSIVELY use **bold text** to highlight key names, dates, and important concepts in the summary.
-            - Use ### headers only if there are multiple distinct sections.
-
-            RETURN JSON STRUCTURE:
+            RETURN JSON:
             {{
-                \"title\": \"Concise title (required)\",
-                \"summary\": \"Markdown summary — highlight core info\",
+                \"title\": \"Title\",
+                \"summary\": \"Markdown summary\",
                 \"facts\": [ {{ \"label\": \"Key\", \"value\": \"Value\" }} ],
-                \"related_topics\": [ \"Topic 1\", \"Topic 2\" ],
-                \"widgets\": [ {{ \"type\": \"map\", \"query\": \"Location Name\" }} ]
+                \"related_topics\": [ \"Topic\" ],
+                \"widgets\": [ {{ \"type\": \"map\", \"query\": \"Location\" }} ]
             }}",
-            user_query
+            query = user_query,
+            instructions = PROMPT_INSTRUCTIONS
         )
     };
 
@@ -97,9 +92,8 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
         Ok(res) => {
             let status = res.status();
             if !status.is_success() {
-                println!("Gemini API Error Status: {}", status);
                 if status.as_u16() == 429 {
-                    return r#"{"error": "The Gemini API rate limit (15 req/min) has been exceeded. Please wait a moment and try again."}"#.to_string();
+                    return r#"{"error": "Rate limit exceeded. Try again in 60s."}"#.to_string();
                 }
             }
             let raw_text = res.text().await.unwrap_or_default();
@@ -107,19 +101,17 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
             
             let extracted_text = json["candidates"][0]["content"]["parts"][0]["text"]
                 .as_str()
-                .unwrap_or("{\"error\": \"Empty response from Gemini\"}");
+                .unwrap_or("{\"error\": \"Empty response\"}");
             
-            // formatting check: remove markdown code blocks if present
             let clean_text = extracted_text
                 .trim()
                 .trim_start_matches("```json")
                 .trim_start_matches("```")
                 .trim_end_matches("```");
 
-            // Inject the URLs directly into the output JSON to guarantee they exist
             let mut final_json: serde_json::Value = serde_json::from_str(clean_text).unwrap_or(serde_json::json!({
                 "title": "Search Error",
-                "summary": "Failed to parse response from LLM."
+                "summary": "AI parsing failed."
             }));
 
             if !urls.is_empty() {
@@ -131,10 +123,7 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
 
             final_json.to_string()
         }
-        Err(e) => {
-            println!("Network Error: {}", e);
-            "{\"error\": \"offline\"}".to_string()
-        },
+        Err(e) => format!("{{\"error\": \"Network error: {}\"}}", e),
     }
 }
 
@@ -146,14 +135,18 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
     );
 
     let prompt = format!(
-        "You are an expert summarizer. Provide a concise 2-4 sentence summary of the following web page content.\n\n\
-        Title: {}\n\n\
-        Content:\n{}\n\n\
-        Instructions:\n\
-        - Focus ONLY on the main facts and core purpose of the page.\n\
-        - Output the summary as plain text (no markdown formatting, no headers, no bullet points).\n\
+        "You are an expert summarizer. Summarize this page.
+        
+        TITLE: {title}
+        CONTENT: {text}
+
+        {instructions}
+
+        - Output the summary as a single block of text.
         - Maximum 4 sentences.",
-        title, text
+        title = title,
+        text = text,
+        instructions = PROMPT_INSTRUCTIONS
     );
 
     let body = GeminiRequest {
@@ -161,12 +154,12 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
             parts: vec![Part { text: prompt }],
         }],
         generation_config: GenerationConfig {
-            response_mime_type: "text/plain".to_string(), // We just need plain text for the summary column
+            response_mime_type: "text/plain".to_string(),
         },
     };
 
     let mut attempts = 0;
-    while attempts < 3 {
+    while attempts < 5 {
         match client.post(&url).json(&body).send().await {
             Ok(res) if res.status().is_success() => {
                 let raw_text = res.text().await.unwrap_or_default();
@@ -180,8 +173,9 @@ pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
             }
             Ok(res) if res.status().as_u16() == 429 => {
                 attempts += 1;
-                tracing::warn!("Gemini 429 Rate Limit hit. Retrying in 2s (Attempt {}/3)", attempts);
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                let wait_secs = 5 + attempts;
+                tracing::warn!("Gemini 429 Rate Limit hit. Retrying in {}s (Attempt {}/5)", wait_secs, attempts);
+                tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
             }
             Ok(res) => {
                 tracing::error!("Gemini summarize API Error Status: {}", res.status());

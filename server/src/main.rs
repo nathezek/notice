@@ -122,7 +122,7 @@ async fn handle_search(
                     }).to_string(),
                     corrected_query: None,
                 }),
-                Err(_) => fallback_to_gemini(query, &state.api_key, None, None, vec![]).await,
+                Err(_) => fallback_to_gemini(query, &state, None, None, vec![]).await,
             }
         }
 
@@ -147,7 +147,7 @@ async fn handle_search(
                         corrected_query: None,
                     })
                 }
-                None => fallback_to_gemini(query, &state.api_key, None, None, vec![]).await,
+                None => fallback_to_gemini(query, &state, None, None, vec![]).await,
             }
         }
 
@@ -174,7 +174,7 @@ async fn handle_search(
                 }),
                 Err(e) => {
                     println!("Currency error: {}", e);
-                    fallback_to_gemini(query, &state.api_key, None, None, vec![]).await
+                    fallback_to_gemini(query, &state, None, None, vec![]).await
                 }
             }
         }
@@ -217,7 +217,7 @@ async fn handle_search(
                     corrected_query: None,
                 });
             }
-            fallback_to_gemini(query, &state.api_key, None, None, vec![]).await
+            fallback_to_gemini(query, &state, None, None, vec![]).await
         }
 
         // ---- General: search index first, then spell-correct/scrape/Gemini ----
@@ -254,13 +254,68 @@ async fn handle_search(
             let (urls, context) = web::gather_context(effective).await;
             let context_ref = if context.is_empty() { None } else { Some(context.as_str()) };
 
-            fallback_to_gemini(effective, &state.api_key, corrected, context_ref, urls).await
+            fallback_to_gemini(effective, &state, corrected, context_ref, urls).await
         }
     }
 }
 
-async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<String>, context: Option<&str>, urls: Vec<String>) -> Json<SearchResponse> {
-    let response = gemini::ask_gemini(query, api_key, context, urls).await;
+async fn fallback_to_gemini(
+    query: &str, 
+    state: &AppState, 
+    corrected_query: Option<String>, 
+    context: Option<&str>, 
+    urls: Vec<String>
+) -> Json<SearchResponse> {
+    let response = gemini::ask_gemini(query, &state.api_key, context, urls.clone()).await;
+    
+    // Background task to cache results if we got a valid response and have URLs
+    if !urls.is_empty() && !response.contains("\"error\"") {
+        let state_clone = state.clone();
+        let response_clone = response.clone();
+        
+        tokio::spawn(async move {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response_clone) {
+                let title = json["title"].as_str().unwrap_or("Search Result").to_string();
+                let summary = json["summary"].as_str().unwrap_or_default().to_string();
+                
+                for url in json["websites"].as_array().unwrap_or(&vec![]) {
+                    if let Some(url_str) = url["url"].as_str() {
+                        let (scraped_title, scraped_text) = web::scrape(url_str).await;
+                        let final_title = scraped_title.unwrap_or_else(|| title.clone());
+                        let final_text = scraped_text.unwrap_or_default();
+
+                        // 1. Vault (Postgres)
+                        let page_data = db::PageData {
+                            url: url_str.to_string(),
+                            title: final_title.clone(),
+                            raw_html: "OMITTED".to_string(),
+                            cleaned_text: final_text.clone(),
+                            summary: Some(summary.clone()),
+                            crawled_at: chrono::Utc::now().naive_utc(),
+                        };
+                        let _ = db::insert_page(&state_clone.db_pool, &page_data).await;
+
+                        // 2. Index (Meilisearch)
+                        use sha2::{Sha256, Digest};
+                        let mut hasher = Sha256::new();
+                        hasher.update(url_str.as_bytes());
+                        let id = hex::encode(hasher.finalize());
+
+                        let doc = indexer::IndexDocument {
+                            id,
+                            url: url_str.to_string(),
+                            title: final_title,
+                            cleaned_text: final_text,
+                            summary: Some(summary.clone()),
+                        };
+                        let _ = indexer::index_page(&state_clone.meili_client, &doc).await;
+                        info!("Auto-cached URL: {}", url_str);
+                    }
+                }
+            }
+        });
+    }
+
     Json(SearchResponse {
         result_type: "concept".to_string(),
         content: response,

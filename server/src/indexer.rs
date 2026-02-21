@@ -11,7 +11,12 @@ pub struct IndexDocument {
 }
 
 pub async fn init_indexer(url: &str, api_key: Option<&str>) -> Client {
-    Client::new(url, api_key).expect("Meilisearch Client initialization failed")
+    let client = Client::new(url, api_key).expect("Meilisearch Client initialization failed");
+    
+    // Ensure the index exists
+    let _ = client.create_index("pages", Some("id")).await;
+    
+    client
 }
 
 pub async fn index_page(client: &Client, doc: &IndexDocument) -> Result<(), Box<dyn std::error::Error>> {

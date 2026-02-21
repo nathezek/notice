@@ -154,15 +154,19 @@ function SearchResults() {
         if ("error" in result) {
             return (
                 <div className="serif-font flex flex-col items-center justify-center">
-                    <span className="my-8 text-center font-sans text-9xl text-neutral-700 dark:text-neutral-200">
-                        \(^Д^)/
-                    </span>
+                    {/*<span className="my-8 text-center font-sans text-9xl text-neutral-700 dark:text-neutral-600">
+                        \(^ _ ^)/
+                    </span>*/}
 
-                    <h3 className="text-normal mb-2 w-96 text-center text-lg leading-relaxed tracking-[0.015rem] opacity-80">
+                    <h3 className="text-normal mt-12 w-96 text-center text-lg leading-relaxed tracking-[0.015rem] opacity-80">
                         It appears that we a currently unable to process your
-                        request, would you mind refreshing the page?
+                        request, would you mind refreshing the page? <br />
+                        <br />
+                        <br />
+                        <span className="text-center text-sm">
+                            {result.error}
+                        </span>
                     </h3>
-                    <p className="text-center text-sm">{result.error}</p>
                 </div>
             );
         }
@@ -270,23 +274,25 @@ function SearchResults() {
                                     <WebsiteList
                                         websites={
                                             result &&
-                                                "websites" in result &&
-                                                Array.isArray(result.websites) &&
-                                                result.websites.length > 0
-                                                ? (result as UniversalResult).websites!.map(
-                                                    (w, idx: number) => ({
-                                                        id: `site-${idx}`,
-                                                        url: w.url,
-                                                        title: w.title,
-                                                        snippet:
-                                                            w.snippet ||
-                                                            new URL(w.url)
-                                                                .hostname,
-                                                        imageUrl:
-                                                            w.imageUrl ||
-                                                            `https://image.thum.io/get/width/400/crop/800/noanimate/${w.url}`,
-                                                    }),
-                                                )
+                                            "websites" in result &&
+                                            Array.isArray(result.websites) &&
+                                            result.websites.length > 0
+                                                ? (
+                                                      result as UniversalResult
+                                                  ).websites!.map(
+                                                      (w, idx: number) => ({
+                                                          id: `site-${idx}`,
+                                                          url: w.url,
+                                                          title: w.title,
+                                                          snippet:
+                                                              w.snippet ||
+                                                              new URL(w.url)
+                                                                  .hostname,
+                                                          imageUrl:
+                                                              w.imageUrl ||
+                                                              `https://image.thum.io/get/width/400/crop/800/noanimate/${w.url}`,
+                                                      }),
+                                                  )
                                                 : MOCK_WEBSITES
                                         }
                                         onWebsiteClick={setSelectedWebsite}

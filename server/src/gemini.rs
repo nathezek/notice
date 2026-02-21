@@ -137,3 +137,61 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
         },
     }
 }
+
+pub async fn summarize_page(api_key: &str, title: &str, text: &str) -> String {
+    let client = reqwest::Client::new();
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+        api_key
+    );
+
+    let prompt = format!(
+        "You are an expert summarizer. Provide a concise 2-4 sentence summary of the following web page content.\n\n\
+        Title: {}\n\n\
+        Content:\n{}\n\n\
+        Instructions:\n\
+        - Focus ONLY on the main facts and core purpose of the page.\n\
+        - Output the summary as plain text (no markdown formatting, no headers, no bullet points).\n\
+        - Maximum 4 sentences.",
+        title, text
+    );
+
+    let body = GeminiRequest {
+        contents: vec![Content {
+            parts: vec![Part { text: prompt }],
+        }],
+        generation_config: GenerationConfig {
+            response_mime_type: "text/plain".to_string(), // We just need plain text for the summary column
+        },
+    };
+
+    let mut attempts = 0;
+    while attempts < 3 {
+        match client.post(&url).json(&body).send().await {
+            Ok(res) if res.status().is_success() => {
+                let raw_text = res.text().await.unwrap_or_default();
+                let json: serde_json::Value = serde_json::from_str(&raw_text).unwrap_or_default();
+                
+                return json["candidates"][0]["content"]["parts"][0]["text"]
+                    .as_str()
+                    .unwrap_or("Failed to generate summary.")
+                    .trim()
+                    .to_string();
+            }
+            Ok(res) if res.status().as_u16() == 429 => {
+                attempts += 1;
+                tracing::warn!("Gemini 429 Rate Limit hit. Retrying in 2s (Attempt {}/3)", attempts);
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            Ok(res) => {
+                tracing::error!("Gemini summarize API Error Status: {}", res.status());
+                return "Summary generation failed due to API error.".to_string();
+            }
+            Err(e) => {
+                tracing::error!("Gemini summarize Network Error: {}", e);
+                return "Summary generation failed due to network error.".to_string();
+            }
+        }
+    }
+    "Summary generation failed due to persistent rate limiting.".to_string()
+}

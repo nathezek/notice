@@ -47,6 +47,15 @@ fn currency_re() -> &'static Regex {
     })
 }
 
+fn timer_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(
+            r"(?i)^(?:set a |start a |create a )?timer (?:for )?\d+(?:\.\d+)?\s*(?:s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b"
+        ).unwrap()
+    })
+}
+
 // -------------------------------------
 
 #[derive(Debug, PartialEq)]
@@ -54,10 +63,14 @@ pub enum QueryType {
     Math,
     UnitConversion,
     CurrencyConversion,
+    Timer,
     General,
 }
 
 pub fn classify(query: &str) -> QueryType {
+    if timer_re().is_match(query) {
+        return QueryType::Timer;
+    }
     // Unit must be checked before currency — unit abbreviations (mph, kph, etc.)
     // are 3 letters and would otherwise match the currency pattern first.
     if unit_re().is_match(query) {

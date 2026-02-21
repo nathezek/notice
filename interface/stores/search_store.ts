@@ -35,10 +35,15 @@ export interface ErrorResult {
     error: string;
 }
 
-export type SearchResult = UniversalResult | MathResult | UnitResult | CurrencyResult | ErrorResult;
+export interface TimerResult {
+    seconds: number;
+    query: string;
+}
+
+export type SearchResult = UniversalResult | MathResult | UnitResult | CurrencyResult | ErrorResult | TimerResult;
 
 // The result_type string from the server, used to pick the right block
-export type ResultType = "concept" | "math" | "unit_conversion" | "currency_conversion" | "error";
+export type ResultType = "concept" | "math" | "unit_conversion" | "currency_conversion" | "error" | "timer";
 
 interface SearchState {
     inputQuery: string;

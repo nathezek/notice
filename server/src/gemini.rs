@@ -43,6 +43,7 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
             Instructions:
             - Extract only the most important facts directly relevant to the query. Do NOT reproduce everything.
             - Be concise: 2-4 sentences for the summary, plus optional facts/sections if helpful.
+            - EXTENSIVELY use **bold text** to highlight key names, dates, and important concepts in the summary.
             - Use ### headers only for multiple distinct sections. Prefer flowing prose if 1 topic.
             - Do not say 'According to the sources' or 'The scraped content says' — write naturally.
 
@@ -66,6 +67,7 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
             Instructions:
             - Highlight the 3-5 most important facts about this topic.
             - Be concise: 2-4 sentences or bullet points. Do NOT write a Wikipedia article.
+            - EXTENSIVELY use **bold text** to highlight key names, dates, and important concepts in the summary.
             - Use ### headers only if there are multiple distinct sections.
 
             RETURN JSON STRUCTURE:
@@ -93,8 +95,12 @@ pub async fn ask_gemini(user_query: &str, api_key: &str, context: Option<&str>, 
 
     match response {
         Ok(res) => {
-            if !res.status().is_success() {
-                println!("Gemini API Error Status: {}", res.status());
+            let status = res.status();
+            if !status.is_success() {
+                println!("Gemini API Error Status: {}", status);
+                if status.as_u16() == 429 {
+                    return r#"{"error": "The Gemini API rate limit (15 req/min) has been exceeded. Please wait a moment and try again."}"#.to_string();
+                }
             }
             let raw_text = res.text().await.unwrap_or_default();
             let json: serde_json::Value = serde_json::from_str(&raw_text).unwrap_or_default();

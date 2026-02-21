@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { WebsiteData } from "@/mock_data/website_mock_data";
 import { motion, AnimatePresence } from "motion/react";
+import Image from "next/image";
 
 interface WebsiteListProps {
     websites: WebsiteData[];
@@ -26,15 +27,17 @@ export const WebsiteList = ({ websites, onWebsiteClick }: WebsiteListProps) => {
                         {/* List Item Content */}
                         <button
                             onClick={() => onWebsiteClick(site)}
-                            className="flex w-full flex-col items-start gap-1 rounded-lg border border-neutral-200 bg-white p-3 text-left transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                            className="flex w-full flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/50"
                         >
-                            <div className="flex items-center gap-2">
-                                <img
+                            <div className="flex w-full items-center gap-2 overflow-hidden">
+                                <Image
                                     src={`https://www.google.com/s2/favicons?domain=${site.url}&sz=32`}
                                     alt=""
-                                    className="h-4 w-4 rounded-sm"
+                                    width={16}
+                                    height={16}
+                                    className="shrink-0 rounded-sm"
                                 />
-                                <span className="line-clamp-1 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                <span className="truncate text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
                                     {site.title}
                                 </span>
                             </div>
@@ -63,11 +66,12 @@ export const WebsiteList = ({ websites, onWebsiteClick }: WebsiteListProps) => {
                                     <div className="overflow-hidden rounded-lg">
                                         <div className="h-32 w-full bg-neutral-100 dark:bg-neutral-800">
                                             {/* Ideally real screenshot, using placeholder or mock image */}
-                                            <img
+                                            <Image
                                                 src={
                                                     site.imageUrl ||
                                                     "https://placehold.co/400x300"
                                                 }
+                                                fill
                                                 alt={site.title}
                                                 className="h-full w-full object-cover"
                                             />

@@ -1,11 +1,12 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchStore, ResultType } from "@/stores/search_store";
 import { UniversalBlock } from "@/components/blocks/universal_block";
 import { CalculatorBlock } from "@/components/blocks/calculator_block";
 import { ConverterBlock } from "@/components/blocks/converter_block";
+import { TimerBlock } from "@/components/blocks/timer_block";
 
 import { MOCK_WEBSITES, WebsiteData } from "@/mock_data/website_mock_data";
 import { WebsiteList } from "@/components/website/website_list";
@@ -34,8 +35,12 @@ function SearchResults() {
         setInputQuery,
     } = useSearchStore();
 
+    const lastQueryRef = useRef<string | null>(null);
+
     useEffect(() => {
         if (!query) return;
+        if (query === lastQueryRef.current) return;
+        lastQueryRef.current = query;
 
         setInputQuery(query);
         setHasSearched(true);
@@ -86,9 +91,11 @@ function SearchResults() {
 
         if ("error" in result) {
             return (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
-                    <h3 className="mb-2 font-semibold">Search Error</h3>
-                    <p>{result.error}</p>
+                <div className="serif-font flex flex-col items-center justify-center">
+                    <span className="text-9xl font-sans my-8 text-center text-neutral-700 dark:text-neutral-200">\(^Д^)/</span>
+
+                    <h3 className="mb-2 text-center text-normal tracking-[0.015rem] leading-relaxed w-96 text-lg opacity-80">It appears that we a currently unable to process your request, would you mind refreshing the page?</h3>
+                    <p className="text-center text-sm">{result.error}</p>
                 </div>
             );
         }
@@ -100,6 +107,8 @@ function SearchResults() {
                 return <ConverterBlock type="unit_conversion" data={result as any} />;
             case "currency_conversion":
                 return <ConverterBlock type="currency_conversion" data={result as any} />;
+            case "timer":
+                return <TimerBlock data={result as any} />;
             case "concept":
             default:
                 return <UniversalBlock data={result as any} />;
@@ -137,7 +146,7 @@ function SearchResults() {
                             >
                                 {query}
                             </button>
-                            {"?"}
+                            {query?.endsWith("?") ? "" : "?"}
                         </div>
                     )}
 

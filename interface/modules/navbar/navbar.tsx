@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useSearchStore } from "@/stores/search_store";
 import { QuerySearchForm } from "../forms/query_search_form";
 import { ThemeSwitcher } from "@/theme/theme_switcher";
-import React from "react";
+import React, { useRef } from "react";
 
 export const Navbar = () => {
     const {
@@ -31,10 +31,20 @@ export const Navbar = () => {
         }
     }, [pathname]);
 
+    const lastPushedQuery = useRef<string | null>(null);
+
     const handleSearch = async (e?: React.SubmitEvent) => {
         if (e) e.preventDefault();
-        if (!inputQuery.trim()) return;
-        router.push(`/search?query=${encodeURIComponent(inputQuery)}`);
+
+        const trimmed = inputQuery.trim();
+        if (!trimmed) return;
+        if (trimmed === lastPushedQuery.current) return;
+
+        lastPushedQuery.current = trimmed;
+        // Reset the ref after a short delay to allow re-searching the same thing later intentionally
+        setTimeout(() => { lastPushedQuery.current = null; }, 1000);
+
+        router.push(`/search?query=${encodeURIComponent(trimmed)}`);
     };
 
     const handleLogoClick = () => {

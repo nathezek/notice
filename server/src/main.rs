@@ -16,6 +16,11 @@ struct SearchRequest {
     query: String,
 }
 
+#[derive(Deserialize)]
+struct CalculateRequest {
+    expression: String,
+}
+
 #[derive(Serialize)]
 struct SearchResponse {
     result_type: String,
@@ -41,6 +46,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/search", post(handle_search))
+        .route("/calculate", post(handle_calculate))
         .layer(cors)
         .with_state(state);
 
@@ -119,6 +125,35 @@ async fn handle_search(
             }
         }
 
+        // ---- Timer ----
+        classifier::QueryType::Timer => {
+            let re = regex::Regex::new(r"(?i)(\d+(?:\.\d+)?)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)").unwrap();
+            let mut total_seconds: f64 = 0.0;
+            for cap in re.captures_iter(query) {
+                let val: f64 = cap[1].parse().unwrap_or(0.0);
+                let unit = &cap[2].to_lowercase();
+                if unit.starts_with('h') {
+                    total_seconds += val * 3600.0;
+                } else if unit.starts_with('m') {
+                    total_seconds += val * 60.0;
+                } else {
+                    total_seconds += val;
+                }
+            }
+            if total_seconds > 0.0 {
+                let content = serde_json::json!({
+                    "seconds": total_seconds as u64,
+                    "query": query.trim()
+                }).to_string();
+                return Json(SearchResponse {
+                    result_type: "timer".to_string(),
+                    content,
+                    corrected_query: None,
+                });
+            }
+            fallback_to_gemini(query, &state.api_key, None, None, vec![]).await
+        }
+
         // ---- General: spell-correct, scrape, then Gemini ----
         classifier::QueryType::General => {
             let corrected = spell::correct_query(query);
@@ -141,4 +176,19 @@ async fn fallback_to_gemini(query: &str, api_key: &str, corrected_query: Option<
         content: response,
         corrected_query,
     })
+}
+
+#[derive(Serialize)]
+struct CalculateResponse {
+    result: String,
+    error: Option<String>,
+}
+
+async fn handle_calculate(
+    Json(payload): Json<CalculateRequest>,
+) -> Json<CalculateResponse> {
+    match calculator::eval_math(&payload.expression) {
+        Ok(res) => Json(CalculateResponse { result: res, error: None }),
+        Err(e) => Json(CalculateResponse { result: "".to_string(), error: Some(e) })
+    }
 }

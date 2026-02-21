@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 interface UnitResult {
     amount: number;
     from: string;
@@ -22,43 +24,100 @@ type ConverterData =
 
 export const ConverterBlock = ({ type, data }: ConverterData) => {
     const isCurrency = type === "currency_conversion";
-    const d = data as UnitResult & CurrencyResult;
+    const initialData = data as any; // Using any internally to share fields
+
+    const [amount, setAmount] = useState(initialData.amount.toString());
+    const [from, setFrom] = useState(initialData.from);
+    const [to, setTo] = useState(initialData.to);
+
+    const [result, setResult] = useState(initialData.result);
+    const [rate, setRate] = useState(initialData.rate || "");
+
+    const category = initialData.category || "Currency";
+
+    useEffect(() => {
+        const handler = setTimeout(async () => {
+            if (!amount || !from || !to) return;
+
+            // Avoid re-fetching the initial payload on mount if nothing changed
+            if (
+                amount === initialData.amount.toString() &&
+                from === initialData.from &&
+                to === initialData.to
+            ) {
+                return;
+            }
+
+            try {
+                const resp = await fetch("http://localhost:4000/search", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: `${amount} ${from} to ${to}` }),
+                });
+                const d = await resp.json();
+
+                if (d.result_type === "currency_conversion" || d.result_type === "unit_conversion") {
+                    const parsed = JSON.parse(d.content);
+                    if (parsed.result) {
+                        setResult(parsed.result);
+                    }
+                    if (parsed.rate) {
+                        setRate(parsed.rate);
+                    }
+                }
+            } catch (e) {
+                console.error("Conversion fetch failed", e);
+            }
+        }, 400); // 400ms debounce
+
+        return () => clearTimeout(handler);
+    }, [amount, from, to, initialData]);
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-6 dark:border-neutral-800 dark:bg-neutral-900">
-                {/* Category badge */}
+            <div className="w-full max-w-sm rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 border-b-4">
                 <span className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                    {isCurrency ? "Currency" : d.category} Conversion
+                    {category} Conversion
                 </span>
 
-                {/* Main display */}
-                <div className="mt-3 flex items-baseline gap-4">
-                    <div className="text-center">
-                        <p className="font-mono text-4xl font-medium text-neutral-900 dark:text-neutral-100">
-                            {d.amount}
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-semibold uppercase text-neutral-500">
-                            {d.from}
-                        </p>
+                <div className="mt-5 flex flex-col gap-3">
+                    {/* Top Row: Amount & Source Unit */}
+                    <div className="flex w-full items-center gap-2">
+                        <input
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            className="flex-1 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 font-mono text-2xl font-medium outline-none transition-colors focus:border-blue-500 focus:bg-white dark:border-neutral-800 dark:bg-neutral-950 dark:focus:border-blue-500 dark:focus:bg-neutral-900"
+                        />
+                        <input
+                            type="text"
+                            value={from}
+                            onChange={(e) => setFrom(e.target.value)}
+                            disabled={!isCurrency}
+                            className="w-24 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-center font-mono text-xl font-bold uppercase outline-none transition-colors focus:border-blue-500 focus:bg-white disabled:pointer-events-none disabled:opacity-70 dark:border-neutral-800 dark:bg-neutral-950 dark:focus:border-blue-500 dark:focus:bg-neutral-900"
+                        />
                     </div>
 
-                    <p className="text-2xl text-neutral-400 dark:text-neutral-600">=</p>
+                    <p className="text-neutral-400 pl-2 font-mono text-xl dark:text-neutral-600">=</p>
 
-                    <div className="text-center">
-                        <p className="font-mono text-4xl font-semibold text-neutral-900 dark:text-neutral-100">
-                            {d.result}
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-semibold uppercase text-neutral-500">
-                            {d.to}
-                        </p>
+                    {/* Bottom Row: Result & Target Unit */}
+                    <div className="flex w-full items-center gap-2">
+                        <div className="flex-1 truncate rounded-xl bg-neutral-100 px-4 py-3 text-right font-mono text-2xl font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100">
+                            {result}
+                        </div>
+                        <input
+                            type="text"
+                            value={to}
+                            onChange={(e) => setTo(e.target.value)}
+                            disabled={!isCurrency}
+                            className="w-24 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-3 text-center font-mono text-xl font-bold uppercase outline-none transition-colors focus:border-blue-500 focus:bg-white disabled:pointer-events-none disabled:bg-neutral-50 disabled:opacity-70 dark:border-neutral-800 dark:bg-neutral-800 dark:focus:border-blue-500 dark:focus:bg-neutral-900"
+                        />
                     </div>
                 </div>
 
-                {/* Exchange rate footnote for currency */}
-                {isCurrency && (
-                    <p className="mt-4 text-xs text-neutral-400 dark:text-neutral-500">
-                        1 {d.from} = {d.rate} {d.to} · via frankfurter.app
+                {isCurrency && rate && (
+                    <p className="mt-6 text-xs text-neutral-400 dark:text-neutral-500 text-center">
+                        <span className="font-mono">1 {from.toUpperCase()} = {rate} {to.toUpperCase()}</span> · via frankfurter.app
                     </p>
                 )}
             </div>

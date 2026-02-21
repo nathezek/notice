@@ -52,12 +52,14 @@ pub fn correct_query(query: &str) -> Option<String> {
     let suggestions = checker.lookup_compound(&clean_query.to_lowercase(), 2);
 
     if let Some(suggestion) = suggestions.first() {
-        let corrected = &suggestion.term;
+        let corrected = suggestion.term.trim();
+        let clean_lower = clean_query.to_lowercase();
+        let clean_lower = clean_lower.trim();
         
         // If the correction isn't identical to the lowercase input
-        if corrected.to_lowercase() != clean_query.to_lowercase() {
+        if corrected.to_lowercase() != clean_lower {
             // Restore original capitalization for the first letter if needed
-            let mut final_correction = corrected.clone();
+            let mut final_correction = corrected.to_string();
             if let Some(first_char) = trimmed.chars().next() {
                 if first_char.is_ascii_uppercase() {
                     let mut c = final_correction.chars();

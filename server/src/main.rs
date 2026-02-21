@@ -1,7 +1,9 @@
 mod calculator;
 mod classifier;
 mod currency;
+mod db;
 mod gemini;
+mod indexer;
 mod spell;
 mod web;
 
@@ -10,6 +12,8 @@ use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::{info, error};
+use tracing_subscriber;
 
 #[derive(Deserialize)]
 struct SearchRequest {
@@ -31,13 +35,43 @@ struct SearchResponse {
 #[derive(Clone)]
 struct AppState {
     api_key: String,
+    db_pool: db::DbPool,
+    meili_client: meilisearch_sdk::client::Client,
 }
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
+    info!("Starting Notice Search Engine...");
+
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set");
-    let state = AppState { api_key };
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    
+    // Initialize DB
+    info!("Connecting to PostgreSQL...");
+    let db_pool = match db::init_db(&database_url).await {
+        Ok(pool) => {
+            info!("Successfully connected to PostgreSQL.");
+            pool
+        }
+        Err(e) => {
+            error!("Failed to connect to PostgreSQL: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Initialize Meilisearch
+    info!("Connecting to Meilisearch...");
+    let meili_client = indexer::init_indexer("http://localhost:7700", None).await;
+
+    let state = AppState { 
+        api_key,
+        db_pool,
+        meili_client
+    };
 
     let cors = CorsLayer::new()
         .allow_origin("http://localhost:3000".parse::<axum::http::HeaderValue>().unwrap())
@@ -47,6 +81,7 @@ async fn main() {
     let app = Router::new()
         .route("/search", post(handle_search))
         .route("/calculate", post(handle_calculate))
+        .route("/index-url", post(handle_index_url))
         .layer(cors)
         .with_state(state);
 
@@ -222,4 +257,91 @@ async fn handle_calculate(
         Ok(res) => Json(CalculateResponse { result: res, error: None }),
         Err(e) => Json(CalculateResponse { result: "".to_string(), error: Some(e) })
     }
+}
+
+#[derive(Deserialize)]
+struct IndexUrlRequest {
+    url: String,
+}
+
+#[derive(Serialize)]
+struct IndexUrlResponse {
+    success: bool,
+    message: String,
+}
+
+// Endpoint specifically to test the indexing pipeline on a single URL
+async fn handle_index_url(
+    State(state): State<AppState>,
+    Json(payload): Json<IndexUrlRequest>,
+) -> Json<IndexUrlResponse> {
+    let url = &payload.url;
+    info!("Received manual request to index URL: {}", url);
+
+    // 1. Scrape the URL
+    info!("Step 1: Scraping...");
+    let (title_opt, text_opt) = web::scrape(url).await;
+    
+    let title = title_opt.unwrap_or_else(|| "Unknown Title".to_string());
+    let clean_text = match text_opt {
+        Some(t) => t,
+        None => {
+            return Json(IndexUrlResponse {
+                success: false,
+                message: "Failed to extract meaningful text from the page.".to_string(),
+            });
+        }
+    };
+
+    // 2. Summarize via Gemini
+    info!("Step 2: Summarizing via Gemini...");
+    let summary = gemini::summarize_page(&state.api_key, &title, &clean_text).await;
+
+    // 3. Save to PostgreSQL (Vault)
+    info!("Step 3: Saving to PostgreSQL...");
+    let page_data = db::PageData {
+        url: url.to_string(),
+        title: title.clone(),
+        raw_html: "OMITTED_FOR_API_TEST".to_string(), // In production we'd save raw HTML here
+        cleaned_text: clean_text.clone(),
+        summary: Some(summary.clone()),
+        crawled_at: chrono::Utc::now().naive_utc(),
+    };
+
+    if let Err(e) = db::insert_page(&state.db_pool, &page_data).await {
+        error!("Failed to save to DB: {}", e);
+        return Json(IndexUrlResponse {
+            success: false,
+            message: format!("Failed to save to database: {}", e),
+        });
+    }
+
+    // 4. Send to Meilisearch (Index)
+    info!("Step 4: Indexing in Meilisearch...");
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_bytes());
+    let id = hex::encode(hasher.finalize()); // Meilisearch ID must be safe chars
+
+    let index_doc = indexer::IndexDocument {
+        id,
+        url: url.to_string(),
+        title,
+        cleaned_text: clean_text,
+        summary: Some(summary),
+    };
+
+    if let Err(e) = indexer::index_page(&state.meili_client, &index_doc).await {
+        error!("Failed to index in Meilisearch: {}", e);
+        return Json(IndexUrlResponse {
+            success: false,
+            message: format!("Failed to index in Meilisearch: {}", e),
+        });
+    }
+
+    info!("Successfully processed and indexed {}", url);
+    Json(IndexUrlResponse {
+        success: true,
+        message: "Successfully scraped, summarized, saved, and indexed.".to_string(),
+    })
 }

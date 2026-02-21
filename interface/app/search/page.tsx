@@ -11,6 +11,7 @@ import { TimerBlock } from "@/components/blocks/timer_block";
 import { MOCK_WEBSITES, WebsiteData } from "@/mock_data/website_mock_data";
 import { WebsiteList } from "@/components/website/website_list";
 import { WebsiteModal } from "@/components/website/website_modal";
+import { IndexerComponent } from "@/components/indexer/indexer";
 
 import { Suspense } from "react";
 import { SearchResultSkeleton, WebsiteListSkeleton } from "@/components/ui/skeleton";
@@ -166,20 +167,23 @@ function SearchResults() {
                             {isLoading ? (
                                 <WebsiteListSkeleton />
                             ) : (
-                                <WebsiteList
-                                    websites={
-                                        result && "websites" in result && Array.isArray(result.websites) && result.websites.length > 0
-                                            ? result.websites.map((w: any, idx: number) => ({
-                                                id: `site-${idx}`,
-                                                url: w.url,
-                                                title: w.title,
-                                                snippet: w.snippet || new URL(w.url).hostname,
-                                                imageUrl: w.imageUrl || `https://image.thum.io/get/width/400/crop/800/noanimate/${w.url}`
-                                            }))
-                                            : MOCK_WEBSITES
-                                    }
-                                    onWebsiteClick={setSelectedWebsite}
-                                />
+                                <div className="flex flex-col gap-8">
+                                    <IndexerComponent />
+                                    <WebsiteList
+                                        websites={
+                                            result && "websites" in result && Array.isArray(result.websites) && result.websites.length > 0
+                                                ? result.websites.map((w: any, idx: number) => ({
+                                                    id: `site-${idx}`,
+                                                    url: w.url,
+                                                    title: w.title,
+                                                    snippet: w.snippet || new URL(w.url).hostname,
+                                                    imageUrl: w.imageUrl || `https://image.thum.io/get/width/400/crop/800/noanimate/${w.url}`
+                                                }))
+                                                : MOCK_WEBSITES
+                                        }
+                                        onWebsiteClick={setSelectedWebsite}
+                                    />
+                                </div>
                             )}
                         </div>
                     </div>

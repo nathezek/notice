@@ -22,3 +22,16 @@ pub async fn index_page(client: &Client, doc: &IndexDocument) -> Result<(), Box<
     
     Ok(())
 }
+
+pub async fn search_index(client: &Client, query: &str) -> Result<Vec<IndexDocument>, Box<dyn std::error::Error>> {
+    let index = client.index("pages");
+    
+    let results = index.search()
+        .with_query(query)
+        .with_limit(3)
+        .execute::<IndexDocument>()
+        .await?;
+
+    let hits = results.hits.into_iter().map(|hit| hit.result).collect();
+    Ok(hits)
+}

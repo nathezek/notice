@@ -12,7 +12,7 @@ use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 use std::env;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, error};
+use tracing::{info, error, debug};
 use tracing_subscriber;
 
 #[derive(Deserialize)]
@@ -220,8 +220,32 @@ async fn handle_search(
             fallback_to_gemini(query, &state.api_key, None, None, vec![]).await
         }
 
-        // ---- General: spell-correct, scrape, then Gemini ----
+        // ---- General: search index first, then spell-correct/scrape/Gemini ----
         classifier::QueryType::General => {
+            info!("General query detected. Checking Meilisearch index for '{}'", query);
+            
+            // Try Meilisearch first
+            match indexer::search_index(&state.meili_client, query).await {
+                Ok(hits) if !hits.is_empty() => {
+                    let hit = &hits[0];
+                    info!("Index HIT found for '{}': {}", query, hit.url);
+                    
+                    return Json(SearchResponse {
+                        result_type: "concept".to_string(),
+                        content: serde_json::json!({
+                            "title": hit.title,
+                            "summary": hit.summary.clone().unwrap_or_default(),
+                            "facts": [],
+                            "related_topics": [],
+                            "websites": [{ "url": hit.url, "title": hit.title }]
+                        }).to_string(),
+                        corrected_query: None,
+                    });
+                }
+                Ok(_) => debug!("Index MISS for '{}'", query),
+                Err(e) => error!("Meilisearch query error: {}", e),
+            }
+
             let corrected = spell::correct_query(query);
             let effective = corrected.clone().unwrap_or_default();
             let effective = if effective.is_empty() { query } else { &effective };

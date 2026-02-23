@@ -40,19 +40,21 @@ export const WebsiteModal = ({
                             damping: 25,
                             stiffness: 300,
                         }}
-                        className="relative z-10 flex h-[92vh] w-[90vw] flex-col overflow-hidden rounded-xs bg-white shadow-2xl border dark:border-neutral-700 dark:bg-neutral-900"
+                        className="relative z-10 flex h-[92vh] w-[90vw] flex-col overflow-hidden rounded-xs border bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-1 dark:bg-neutral-800 dark:border-neutral-700">
+                        <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-1 dark:border-neutral-700 dark:bg-neutral-800">
                             <div />
-                            <div className="text-xs h-7 dark:bg-neutral-700/60 bg-blue-100 text-blue-500 dark:text-blue-300 rounded-md flex items-center justify-center max-w-2xl px-2 gap-x-4">
+                            <div className="flex h-7 max-w-3xl items-center justify-between gap-x-4 rounded-md bg-blue-100 px-2 text-xs text-blue-500 dark:bg-neutral-700/60 dark:text-blue-300">
                                 <IconLock size={14} />
-                                {website.title}
+                                <span className="max-w-[90%] truncate">
+                                    {website.title}
+                                </span>
                                 <IconCopy size={14} />
                             </div>
                             <button
                                 onClick={onClose}
-                                className="rounded-sm p-1 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700/50 cursor-pointer"
+                                className="cursor-pointer rounded-sm p-1 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700/50"
                             >
                                 <IconX size={18} />
                             </button>

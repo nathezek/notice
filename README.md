@@ -76,3 +76,36 @@ graph TD
     bun install
     bun run dev
     ```
+
+---
+
+## ✍️ Developer's Note
+
+### Why I built this
+**Notice** started as a journey to solve a personal frustration: the "information wall." Traditional search engines give you links, and LLMs give you text, but bridging the two often feels disjointed. I wanted a tool that feels like a research assistant—something that gives me the raw data immediately but works in the background to build the "bigger picture." It's about speed without sacrificing depth.
+
+### What I've learned
+This project was a deep dive into the world of **systems-level performance meets high-level AI orchestration**. 
+- **Rust is a beast**: Moving from higher-level languages to Rust for the backend taught me so much about memory safety and the power of zero-cost abstractions. Handling asynchronous AI streams with Tokyo was a challenge but incredibly rewarding.
+- **UX for AI is tricky**: I learned that users don't just want AI; they want to know *what* the AI is doing. This led to the decoupled search approach—showing immediate results first so the user never feels like they're just staring at a loading spinner.
+- **Meilisearch is lightning**: Integrating Meilisearch was a game changer for the "instant" feel of the app.
+
+### What's coming next
+The goal is to move from "search engine" to "knowledge workspace." I want to refine how Gemini interprets complex queries and make the interactive widgets feel even more integrated into the search results.
+
+---
+
+## 🗺️ Future Roadmap
+
+We're just getting started! Here are some features I'm excited to explore:
+
+- [ ] **Personalized Knowledge Graphs**: Building a visual map of how your searches connect over time.
+- [ ] **Multi-modal Insights**: Search for a topic and get a summary that combines text, generated charts, and relevant snippets.
+- [ ] **Collaborative Search Sessions**: Shared workspaces where teams can research together in real-time.
+- [ ] **Custom AI Personas**: Allow users to swap between different search "vibes" (e.g., "The Skeptic," "The Summarizer," "The Academic").
+- [ ] **Offline-first Search Local Indexes**: Search through your own locally indexed documents with the same AI-powered speed.
+
+---
+
+## 🤝 Contributing
+Feel free to open an issue or submit a pull request if you have ideas on how to make **Notice** even better. Let's build the future of search together!

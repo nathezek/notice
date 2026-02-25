@@ -2,33 +2,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// ─── Documents (scraped web content) ───
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Document {
-    pub id: Uuid,
-    pub url: String,
-    pub title: Option<String>,
-    pub raw_content: String,
-    pub summary: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScrapedPage {
-    pub url: String,
-    pub title: Option<String>,
-    pub text_content: String,
-    pub scraped_at: DateTime<Utc>,
-}
-
-// ─── Search ───
+// ─── Search API ───
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchRequest {
     pub query: String,
     pub user_id: Option<Uuid>,
+    pub session_id: Option<String>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
@@ -52,20 +32,11 @@ pub struct SearchResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstantAnswer {
-    pub answer_type: String, // "calculation", "timer", "definition"
+    pub answer_type: String,
     pub value: String,
 }
 
-// ─── Users ───
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
-    pub id: Uuid,
-    pub username: String,
-    #[serde(skip_serializing)]
-    pub password_hash: String,
-    pub created_at: DateTime<Utc>,
-}
+// ─── Auth API ───
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateUserRequest {
@@ -83,4 +54,30 @@ pub struct LoginRequest {
 pub struct AuthResponse {
     pub token: String,
     pub user_id: Uuid,
+    pub username: String,
+}
+
+// ─── Content Submission API ───
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitUrlRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitUrlResponse {
+    pub id: Uuid,
+    pub url: String,
+    pub status: String,
+    pub message: String,
+}
+
+// ─── Crawler Internal ───
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScrapedPage {
+    pub url: String,
+    pub title: Option<String>,
+    pub text_content: String,
+    pub scraped_at: DateTime<Utc>,
 }

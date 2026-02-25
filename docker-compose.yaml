@@ -51,6 +51,24 @@ services:
             timeout: 5s
             retries: 5
 
+    meilibridge:
+        image: binarytouch/meilibridge:latest
+        container_name: notice-meilibridge
+        depends_on:
+            postgres:
+                condition: service_healthy
+            meilisearch:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        volumes:
+            - ./config/meilibridge.yaml:/config.yaml:ro
+        environment:
+            MEILIBRIDGE_CONFIG: /config.yaml
+        ports:
+            - "7708:7708"
+        restart: unless-stopped
+
 volumes:
     pgdata:
     meilidata:

@@ -1,3 +1,9 @@
+pub mod crawl_queue;
+pub mod documents;
+pub mod knowledge_graph;
+pub mod search_history;
+pub mod users;
+
 use sqlx::postgres::{PgPool, PgPoolOptions};
 
 /// Create a PostgreSQL connection pool.
@@ -10,7 +16,6 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, notice_core::Erro
 
     tracing::info!("Connected to PostgreSQL");
 
-    // Verify the connection works
     sqlx::query("SELECT 1")
         .execute(&pool)
         .await
@@ -21,5 +26,13 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool, notice_core::Erro
     Ok(pool)
 }
 
-// Future: query functions for documents, users, knowledge graph, etc.
-// Those will be added when we define the schema in Step 2.
+/// Run embedded migrations.
+pub async fn run_migrations(pool: &PgPool) -> Result<(), notice_core::Error> {
+    sqlx::migrate!("../../migrations")
+        .run(pool)
+        .await
+        .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+    tracing::info!("Database migrations applied");
+    Ok(())
+}

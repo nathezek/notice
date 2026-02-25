@@ -25,4 +25,7 @@ pub enum Error {
 
     #[error("Validation error: {0}")]
     Validation(String),
+
+    #[error("Conflict: {0}")]
+    Conflict(String),
 }

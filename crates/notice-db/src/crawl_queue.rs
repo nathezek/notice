@@ -52,7 +52,39 @@ pub async fn enqueue(
     .map_err(|e| notice_core::Error::Database(e.to_string()))
 }
 
-/// Atomically dequeue the next pending URL.
+/// Enqueue multiple URLs at once. Ignores duplicates.
+/// Returns the count of newly inserted URLs.
+pub async fn enqueue_batch(
+    pool: &PgPool,
+    urls: &[String],
+    priority: i32,
+) -> Result<u64, notice_core::Error> {
+    if urls.is_empty() {
+        return Ok(0);
+    }
+
+    let mut inserted: u64 = 0;
+    for url in urls {
+        let result = sqlx::query(
+            r#"
+            INSERT INTO crawl_queue (url, priority)
+            VALUES ($1, $2)
+            ON CONFLICT (url) DO NOTHING
+            "#,
+        )
+        .bind(url)
+        .bind(priority)
+        .execute(pool)
+        .await
+        .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+        inserted += result.rows_affected();
+    }
+
+    Ok(inserted)
+}
+
+/// Automically dequeue the next pending URL.
 /// Uses FOR UPDATE SKIP LOCKED for safe concurrent access.
 pub async fn dequeue_next(pool: &PgPool) -> Result<Option<CrawlQueueRow>, notice_core::Error> {
     sqlx::query_as::<_, CrawlQueueRow>(
@@ -107,6 +139,41 @@ pub async fn mark_failed(pool: &PgPool, id: Uuid, error: &str) -> Result<(), not
     .await
     .map_err(|e| notice_core::Error::Database(e.to_string()))?;
     Ok(())
+}
+
+/// Check if a URL already exists in documents OR in the crawl queue.
+/// Used to avoid enqueuing URLs we already know about.
+pub async fn url_is_known(pool: &PgPool, url: &str) -> Result<bool, notice_core::Error> {
+    let in_docs: (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM documents WHERE url = $1)")
+        .bind(url)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+    if in_docs.0 {
+        return Ok(true);
+    }
+
+    let in_queue: (bool,) =
+        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM crawl_queue WHERE url = $1)")
+            .bind(url)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+    Ok(in_queue.0)
+}
+
+/// Reset any stale in_progress items back to pending.
+/// Called at startup in case the server crashed while processing.
+pub async fn reset_stale(pool: &PgPool) -> Result<u64, notice_core::Error> {
+    let result =
+        sqlx::query("UPDATE crawl_queue SET status = 'pending' WHERE status = 'in_progress'")
+            .execute(pool)
+            .await
+            .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+    Ok(result.rows_affected())
 }
 
 /// Get queue statistics.

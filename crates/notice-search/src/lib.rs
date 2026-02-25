@@ -1,4 +1,5 @@
 use meilisearch_sdk::client::Client;
+use meilisearch_sdk::search::Selectors;
 use notice_core::types::SearchResult;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -114,9 +115,9 @@ impl SearchClient {
             .with_limit(limit)
             .with_offset(offset)
             .with_show_ranking_score(true)
-            .with_attributes_to_crop(["summary", "raw_content"])
+            .with_attributes_to_crop(Selectors::Some(&[("summary", None), ("raw_content", None)]))
             .with_crop_length(200)
-            .with_attributes_to_highlight(["title", "summary"])
+            .with_attributes_to_highlight(Selectors::Some(&["title", "summary"]))
             .execute::<MeiliDocument>()
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;

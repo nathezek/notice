@@ -23,7 +23,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/submit", post(content::submit_url))
         .route("/api/crawl", post(content::crawl_url))
         .route("/api/documents", get(content::list_documents))
-        .route("/api/documents/:id", get(content::get_document))
+        .route("/api/documents/{id}", get(content::get_document))
         .route("/api/queue/stats", get(content::queue_stats))
         // State
         .with_state(state)

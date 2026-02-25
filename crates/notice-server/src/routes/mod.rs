@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod content;
 pub mod health;
+pub mod kg;
 pub mod search;
 
 use axum::{
@@ -28,6 +29,9 @@ pub fn create_router(state: AppState) -> Router {
         // Crawler control
         .route("/api/crawler/status", get(content::crawler_status))
         .route("/api/crawler/stop", post(content::crawler_stop))
+        // Knowledge Graph
+        .route("/api/users/{user_id}/kg", get(kg::get_user_kg))
+        .route("/api/users/{user_id}/kg/context", get(kg::get_user_context))
         // Admin
         .route("/api/admin/resync", post(content::resync_to_meilisearch))
         // State

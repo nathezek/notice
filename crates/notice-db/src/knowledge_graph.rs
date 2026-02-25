@@ -188,3 +188,52 @@ pub async fn get_all_relationships(
     .await
     .map_err(|e| notice_core::Error::Database(e.to_string()))
 }
+
+/// Get entities that are strongly related to the given entity names
+/// through co_searched relationships. Used for query expansion.
+///
+/// Example: if "ownership" has a co_searched relationship with "rust" (weight 3.0),
+/// and we query for related entities of ["ownership"], we get ["rust"].
+pub async fn get_related_entities(
+    pool: &PgPool,
+    user_id: Uuid,
+    entity_names: &[String],
+    min_weight: f64,
+    limit: i64,
+) -> Result<Vec<KgEntityRow>, notice_core::Error> {
+    if entity_names.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let names_lower: Vec<String> = entity_names.iter().map(|n| n.to_lowercase()).collect();
+
+    // Find entities connected to the given names through relationships
+    sqlx::query_as::<_, KgEntityRow>(
+        r#"
+        SELECT DISTINCT e2.*
+        FROM kg_entities e1
+        JOIN kg_relationships r ON (
+            (r.from_entity_id = e1.id OR r.to_entity_id = e1.id)
+            AND r.user_id = $1
+            AND r.weight >= $3
+        )
+        JOIN kg_entities e2 ON (
+            (e2.id = r.from_entity_id OR e2.id = r.to_entity_id)
+            AND e2.id != e1.id
+            AND e2.user_id = $1
+        )
+        WHERE e1.user_id = $1
+        AND LOWER(e1.name) = ANY($2)
+        AND LOWER(e2.name) != ALL($2)
+        ORDER BY e2.weight DESC
+        LIMIT $4
+        "#,
+    )
+    .bind(user_id)
+    .bind(&names_lower)
+    .bind(min_weight)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| notice_core::Error::Database(e.to_string()))
+}

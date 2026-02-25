@@ -85,3 +85,62 @@ pub async fn get_recent_for_session(
     .await
     .map_err(|e| notice_core::Error::Database(e.to_string()))
 }
+
+/// Get recent search queries for a user within the last N minutes.
+/// Used for session-based disambiguation.
+pub async fn get_recent_queries(
+    pool: &PgPool,
+    user_id: Option<Uuid>,
+    session_id: Option<&str>,
+    minutes: i64,
+    limit: i64,
+) -> Result<Vec<String>, notice_core::Error> {
+    // Try user-based first, fall back to session-based
+    if let Some(uid) = user_id {
+        let rows = sqlx::query_as::<_, (String,)>(
+            r#"
+            SELECT DISTINCT query FROM search_history
+            WHERE user_id = $1
+            AND intent = 'search'
+            AND created_at > NOW() - INTERVAL '1 minute' * $2
+            ORDER BY query
+            LIMIT $3
+            "#,
+        )
+        .bind(uid)
+        .bind(minutes as f64)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+        let queries: Vec<String> = rows.into_iter().map(|(q,)| q).collect();
+        if !queries.is_empty() {
+            return Ok(queries);
+        }
+    }
+
+    // Fall back to session-based
+    if let Some(sid) = session_id {
+        let rows = sqlx::query_as::<_, (String,)>(
+            r#"
+            SELECT DISTINCT query FROM search_history
+            WHERE session_id = $1
+            AND intent = 'search'
+            AND created_at > NOW() - INTERVAL '1 minute' * $2
+            ORDER BY query
+            LIMIT $3
+            "#,
+        )
+        .bind(sid)
+        .bind(minutes as f64)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| notice_core::Error::Database(e.to_string()))?;
+
+        return Ok(rows.into_iter().map(|(q,)| q).collect());
+    }
+
+    Ok(vec![])
+}

@@ -125,3 +125,66 @@ pub async fn get_context_terms(
 
     Ok(rows.into_iter().map(|(name,)| name).collect())
 }
+
+/// Find entities matching a list of names for a specific user.
+/// Used for finding overlap between query terms and existing KG entities.
+pub async fn find_entities_by_names(
+    pool: &PgPool,
+    user_id: Uuid,
+    names: &[String],
+) -> Result<Vec<KgEntityRow>, notice_core::Error> {
+    if names.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Build a query with ANY() for the names list
+    sqlx::query_as::<_, KgEntityRow>(
+        r#"
+        SELECT * FROM kg_entities
+        WHERE user_id = $1
+        AND LOWER(name) = ANY($2)
+        ORDER BY weight DESC
+        "#,
+    )
+    .bind(user_id)
+    .bind(&names.iter().map(|n| n.to_lowercase()).collect::<Vec<_>>())
+    .fetch_all(pool)
+    .await
+    .map_err(|e| notice_core::Error::Database(e.to_string()))
+}
+
+/// Get all entities for a user (for inspection/debugging).
+pub async fn get_all_entities(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<KgEntityRow>, notice_core::Error> {
+    sqlx::query_as::<_, KgEntityRow>(
+        r#"
+        SELECT * FROM kg_entities
+        WHERE user_id = $1
+        ORDER BY weight DESC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| notice_core::Error::Database(e.to_string()))
+}
+
+/// Get all relationships for a user (for inspection/debugging).
+pub async fn get_all_relationships(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<KgRelationshipRow>, notice_core::Error> {
+    sqlx::query_as::<_, KgRelationshipRow>(
+        r#"
+        SELECT * FROM kg_relationships
+        WHERE user_id = $1
+        ORDER BY weight DESC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| notice_core::Error::Database(e.to_string()))
+}

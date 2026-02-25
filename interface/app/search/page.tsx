@@ -281,7 +281,7 @@ function SearchResults() {
                                 <WebsiteListSkeleton />
                             ) : (
                                 <div className="flex flex-col gap-8">
-                                    <IndexerComponent />
+                                    {/*<IndexerComponent />*/}
                                     <WebsiteList
                                         websites={
                                             result &&

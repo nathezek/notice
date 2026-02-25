@@ -21,7 +21,7 @@ export const QuerySearchForm = ({
             <input
                 type="text"
                 value={inputQuery}
-                className="h-full flex-1 truncate bg-transparent px-2 font-medium tracking-wide outline-none"
+                className="h-full flex-1 truncate bg-transparent px-2 font-medium tracking-tight outline-none"
                 placeholder="Search"
                 onChange={(e) => setInputQuery(e.target.value)}
             />

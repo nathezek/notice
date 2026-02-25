@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::env;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, error};
+use tracing::{error, info};
 use tracing_subscriber; // Required for Identity Matching
 
 #[derive(Deserialize)]
@@ -355,8 +355,14 @@ async fn fallback_to_gemini(
                     summary: Some(summary.clone()),
                 };
                 match indexer::index_page(&state_clone.meili_client, &query_doc).await {
-                    Ok(_) => info!("Successfully indexed query ID '{}' for cached search", query_id_clone),
-                    Err(e) => error!("Failed to background index query ID '{}': {}", query_id_clone, e),
+                    Ok(_) => info!(
+                        "Successfully indexed query ID '{}' for cached search",
+                        query_id_clone
+                    ),
+                    Err(e) => error!(
+                        "Failed to background index query ID '{}': {}",
+                        query_id_clone, e
+                    ),
                 }
             }
         });

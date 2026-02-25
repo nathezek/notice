@@ -1,18 +1,25 @@
 use scraper::{Html, Selector};
+use std::collections::HashSet;
 
 /// Extract links from HTML content and resolve them to absolute URLs.
-/// Filters out non-HTTP(S) links, anchors, and common non-content paths.
+/// Only returns links on the SAME DOMAIN as the base URL.
+/// Filters out non-HTTP(S), anchors, assets, and common non-content paths.
 pub fn extract_links(html: &str, base_url: &str) -> Vec<String> {
     let base = match url::Url::parse(base_url) {
         Ok(u) => u,
         Err(_) => return vec![],
     };
 
+    let base_domain = match base.host_str() {
+        Some(h) => h.to_string(),
+        None => return vec![],
+    };
+
     let document = Html::parse_document(html);
     let link_selector = Selector::parse("a[href]").unwrap();
 
     let mut links: Vec<String> = vec![];
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
 
     for element in document.select(&link_selector) {
         let href = match element.value().attr("href") {
@@ -41,13 +48,30 @@ pub fn extract_links(html: &str, base_url: &str) -> Vec<String> {
             continue;
         }
 
+        // ── SAME DOMAIN ONLY ──
+        // This prevents crawling every language version of Wikipedia,
+        // external sites linked from articles, etc.
+        let link_domain = match absolute.host_str() {
+            Some(h) => h.to_string(),
+            None => continue,
+        };
+
+        if link_domain != base_domain {
+            continue;
+        }
+
         // Remove fragment
-        let mut clean = absolute.clone();
+        let mut clean = absolute;
         clean.set_fragment(None);
         let url_str = clean.to_string();
 
-        // Skip common non-content paths
+        // Skip non-content paths
         if should_skip_url(&url_str) {
+            continue;
+        }
+
+        // Skip Wikipedia special pages, talk pages, user pages, etc.
+        if is_wikipedia_noise(&url_str) {
             continue;
         }
 
@@ -60,7 +84,7 @@ pub fn extract_links(html: &str, base_url: &str) -> Vec<String> {
     links
 }
 
-/// Returns true for URLs we should skip (login pages, assets, etc.)
+/// URLs we should never crawl (assets, auth pages, etc.)
 fn should_skip_url(url: &str) -> bool {
     let skip_patterns = [
         "/login",
@@ -90,8 +114,48 @@ fn should_skip_url(url: &str) -> bool {
         ".iso",
         ".xml",
         ".json",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".eot",
     ];
 
     let lower = url.to_lowercase();
     skip_patterns.iter().any(|p| lower.contains(p))
+}
+
+/// Filter out Wikipedia-specific noise pages.
+/// These are pages that aren't actual content articles.
+fn is_wikipedia_noise(url: &str) -> bool {
+    let noise_patterns = [
+        "/wiki/Special:",
+        "/wiki/Talk:",
+        "/wiki/User:",
+        "/wiki/User_talk:",
+        "/wiki/Wikipedia:",
+        "/wiki/Wikipedia_talk:",
+        "/wiki/File:",
+        "/wiki/File_talk:",
+        "/wiki/MediaWiki:",
+        "/wiki/Template:",
+        "/wiki/Template_talk:",
+        "/wiki/Help:",
+        "/wiki/Help_talk:",
+        "/wiki/Category:",
+        "/wiki/Category_talk:",
+        "/wiki/Portal:",
+        "/wiki/Portal_talk:",
+        "/wiki/Draft:",
+        "/wiki/Module:",
+        "/w/index.php",
+        "/wiki/Main_Page",
+        "action=edit",
+        "action=history",
+        "oldid=",
+        "printable=yes",
+        "#cite",
+        "#References",
+    ];
+
+    noise_patterns.iter().any(|p| url.contains(p))
 }

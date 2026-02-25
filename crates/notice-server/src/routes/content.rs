@@ -126,11 +126,7 @@ pub async fn crawl_url(
     tracing::info!(doc_id = %doc.id, "Document stored in PostgreSQL");
 
     // Summarize
-    let content_for_summary = if page.text_content.len() > 8000 {
-        page.text_content[..8000].to_string()
-    } else {
-        page.text_content.clone()
-    };
+    let content_for_summary = notice_core::truncate_utf8(&page.text_content, 8000).to_string();
 
     let doc = match state.gemini.summarize(&content_for_summary).await {
         Ok(summary) if !summary.is_empty() => {

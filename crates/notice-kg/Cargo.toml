@@ -5,6 +5,11 @@ edition.workspace = true
 
 [dependencies]
 notice-core = { workspace = true }
-petgraph = { workspace = true }
+notice-db = { workspace = true }
+notice-ai = { workspace = true }
+
+sqlx = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }

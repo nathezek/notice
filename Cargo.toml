@@ -11,6 +11,7 @@ license = "Apache-2.0"
 [workspace.dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
 
 # Web framework
 axum = "0.8"

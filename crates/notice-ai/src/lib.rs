@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-const GEMINI_BASE_URL: &str =
-    "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL: &str = "gemini-2.0-flash";
+const GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_MODEL: &str = "gemini-2.5-flash";
 
 /// Client for the Gemini API.
 #[derive(Clone)]
@@ -32,6 +31,14 @@ struct Part {
 #[derive(Deserialize)]
 struct GeminiResponse {
     candidates: Option<Vec<Candidate>>,
+    error: Option<GeminiError>,
+}
+
+#[derive(Deserialize)]
+struct GeminiError {
+    message: String,
+    #[allow(dead_code)]
+    code: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -49,6 +56,22 @@ struct CandidatePart {
     text: String,
 }
 
+// ─── Top-level error response (different shape) ───
+
+#[derive(Deserialize)]
+struct GeminiErrorResponse {
+    error: GeminiErrorDetail,
+}
+
+#[derive(Deserialize)]
+struct GeminiErrorDetail {
+    message: String,
+    #[allow(dead_code)]
+    code: Option<i32>,
+    #[allow(dead_code)]
+    status: Option<String>,
+}
+
 // ─── Implementation ───
 
 impl GeminiClient {
@@ -58,6 +81,18 @@ impl GeminiClient {
             api_key: api_key.to_string(),
             model: DEFAULT_MODEL.to_string(),
         }
+    }
+
+    /// Test the connection to Gemini with a minimal prompt.
+    /// Returns Ok(()) if the API key is valid and the model responds.
+    pub async fn test_connection(&self) -> Result<(), notice_core::Error> {
+        let response = self.generate("Respond with only the word: OK").await?;
+        if response.is_empty() {
+            return Err(notice_core::Error::Ai(
+                "Gemini returned empty response".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// Send a prompt to Gemini and return the text response.
@@ -75,27 +110,47 @@ impl GeminiClient {
             }],
         };
 
-        let response = self
-            .http
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| notice_core::Error::Ai(e.to_string()))?;
+        let response =
+            self.http.post(&url).json(&body).send().await.map_err(|e| {
+                notice_core::Error::Ai(format!("Failed to reach Gemini API: {}", e))
+            })?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(notice_core::Error::Ai(format!(
-                "Gemini API returned {}: {}",
-                status, body
-            )));
+        let status = response.status();
+
+        if !status.is_success() {
+            let body_text = response.text().await.unwrap_or_default();
+
+            // Try to parse structured error
+            let error_msg = if let Ok(err) = serde_json::from_str::<GeminiErrorResponse>(&body_text)
+            {
+                format!("Gemini API error (HTTP {}): {}", status, err.error.message)
+            } else {
+                format!("Gemini API error (HTTP {}): {}", status, body_text)
+            };
+
+            tracing::error!("{}", error_msg);
+            return Err(notice_core::Error::Ai(error_msg));
         }
 
-        let gemini_response: GeminiResponse = response
-            .json()
-            .await
-            .map_err(|e| notice_core::Error::Ai(e.to_string()))?;
+        let body_text = response.text().await.map_err(|e| {
+            notice_core::Error::Ai(format!("Failed to read Gemini response: {}", e))
+        })?;
+
+        let gemini_response: GeminiResponse = serde_json::from_str(&body_text).map_err(|e| {
+            notice_core::Error::Ai(format!(
+                "Failed to parse Gemini response: {} — body: {}",
+                e,
+                &body_text[..body_text.len().min(500)]
+            ))
+        })?;
+
+        // Check for inline error
+        if let Some(err) = gemini_response.error {
+            return Err(notice_core::Error::Ai(format!(
+                "Gemini API returned error: {}",
+                err.message
+            )));
+        }
 
         let text = gemini_response
             .candidates
@@ -110,10 +165,17 @@ impl GeminiClient {
             })
             .unwrap_or_default();
 
+        if text.is_empty() {
+            tracing::warn!(
+                "Gemini returned empty text for prompt (first 100 chars): {}",
+                &prompt[..prompt.len().min(100)]
+            );
+        }
+
         Ok(text)
     }
 
-    /// Summarize a piece of web content.
+    /// Summarize web content.
     pub async fn summarize(&self, content: &str) -> Result<String, notice_core::Error> {
         let prompt = format!(
             "Summarize the following web page content in 2-3 concise sentences. \

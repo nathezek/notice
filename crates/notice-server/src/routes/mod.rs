@@ -25,6 +25,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/documents", get(content::list_documents))
         .route("/api/documents/{id}", get(content::get_document))
         .route("/api/queue/stats", get(content::queue_stats))
+        // Admin
+        .route("/api/admin/resync", post(content::resync_to_meilisearch))
         // State
         .with_state(state)
 }

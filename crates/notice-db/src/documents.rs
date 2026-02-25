@@ -147,6 +147,28 @@ pub async fn count(pool: &PgPool) -> Result<i64, notice_core::Error> {
     Ok(row.0)
 }
 
+/// List full documents (including raw_content) for Meilisearch sync.
+/// Only used by the resync endpoint — avoid using in regular API responses.
+pub async fn list_full(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<DocumentRow>, notice_core::Error> {
+    sqlx::query_as::<_, DocumentRow>(
+        r#"
+        SELECT *
+        FROM documents
+        ORDER BY created_at ASC
+        LIMIT $1 OFFSET $2
+        "#,
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| notice_core::Error::Database(e.to_string()))
+}
+
 // ─── Helpers ───
 
 fn extract_domain(raw_url: &str) -> Result<String, notice_core::Error> {

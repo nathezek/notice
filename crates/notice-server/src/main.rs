@@ -38,9 +38,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 7. Configure Meilisearch index ──
     search_client.configure_index().await?;
 
+    // Log current document count
+    match search_client.document_count().await {
+        Ok(count) => tracing::info!("Meilisearch documents index: {} documents", count),
+        Err(e) => tracing::warn!("Could not get Meilisearch document count: {}", e),
+    }
+
     // ── 8. Create Gemini client ──
     let gemini_client = notice_ai::GeminiClient::new(&config.gemini_api_key);
-    tracing::info!("Gemini client initialized");
+
+    // Test Gemini connectivity (warn but don't block startup)
+    match gemini_client.test_connection().await {
+        Ok(()) => tracing::info!("Gemini API connection verified"),
+        Err(e) => tracing::warn!(
+            "Gemini API test failed: {} — Summarization will not work until this is fixed",
+            e
+        ),
+    }
 
     // ── 9. Build app state ──
     let app_state = state::AppState {

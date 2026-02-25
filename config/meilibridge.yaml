@@ -1,16 +1,13 @@
 # MeiliBridge configuration for Notice V2
-# Syncs the documents table from PostgreSQL to Meilisearch
+# Syncs the documents table from PostgreSQL to Meilisearch via CDC
 
 source:
     type: postgresql
-    host: notice-postgres # Docker service name
+    host: notice-postgres
     port: 5432
     database: notice
     username: meilibridge
     password: meilibridge_pass
-    publication: meilibridge_pub
-    slot_name: meilibridge_slot
-    create_slot: true
 
 meilisearch:
     url: http://notice-meilisearch:7700

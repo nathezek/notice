@@ -4,9 +4,37 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use notice_core::types::{SubmitUrlRequest, SubmitUrlResponse};
+use notice_search::MeiliDocumentInput;
 
 use crate::error::ApiError;
 use crate::state::AppState;
+
+// ─── Helper: sync a document to Meilisearch ───
+
+fn doc_row_to_meili(doc: &notice_db::documents::DocumentRow) -> MeiliDocumentInput {
+    MeiliDocumentInput {
+        id: doc.id,
+        url: doc.url.clone(),
+        domain: doc.domain.clone(),
+        title: doc.title.clone(),
+        raw_content: doc.raw_content.clone(),
+        summary: doc.summary.clone(),
+        status: doc.status.clone(),
+    }
+}
+
+/// Push a document to Meilisearch directly. Logs errors but doesn't fail the request.
+async fn sync_to_meilisearch(state: &AppState, doc: &notice_db::documents::DocumentRow) {
+    let meili_doc = doc_row_to_meili(doc);
+    match state.search.add_document(meili_doc).await {
+        Ok(()) => tracing::info!(doc_id = %doc.id, "Document synced to Meilisearch"),
+        Err(e) => tracing::error!(
+            doc_id = %doc.id,
+            error = %e,
+            "Failed to sync document to Meilisearch"
+        ),
+    }
+}
 
 // ─── Submit URL to crawl queue ───
 
@@ -50,22 +78,18 @@ pub async fn submit_url(
                 message: "URL has been added to the crawl queue".to_string(),
             }))
         }
-        None => {
-            // ON CONFLICT DO NOTHING — already in queue
-            Ok(Json(SubmitUrlResponse {
-                id: Uuid::nil(),
-                url,
-                status: "already_queued".to_string(),
-                message: "This URL is already in the crawl queue".to_string(),
-            }))
-        }
+        None => Ok(Json(SubmitUrlResponse {
+            id: Uuid::nil(),
+            url,
+            status: "already_queued".to_string(),
+            message: "This URL is already in the crawl queue".to_string(),
+        })),
     }
 }
 
-// ─── Immediate crawl (for development/testing) ───
+// ─── Immediate crawl ───
 
-/// POST /api/crawl — Immediately scrape a URL, summarize it, and store it.
-/// This bypasses the crawl queue. Use /api/submit for production.
+/// POST /api/crawl — Immediately scrape, summarize, store, and index a URL.
 pub async fn crawl_url(
     State(state): State<AppState>,
     Json(body): Json<SubmitUrlRequest>,
@@ -74,6 +98,10 @@ pub async fn crawl_url(
     if url.is_empty() {
         return Err(notice_core::Error::Validation("URL cannot be empty".into()).into());
     }
+
+    // Validate URL
+    url::Url::parse(&url)
+        .map_err(|e| notice_core::Error::Validation(format!("Invalid URL: {}", e)))?;
 
     // Check if already exists
     if let Some(existing) = notice_db::documents::get_by_url(&state.db, &url).await? {
@@ -85,7 +113,7 @@ pub async fn crawl_url(
     // Step 1: Scrape
     let page = notice_crawler::scrape_url(&url).await?;
 
-    // Step 2: Store in database
+    // Step 2: Store in PostgreSQL
     let doc = notice_db::documents::insert(
         &state.db,
         &page.url,
@@ -94,16 +122,22 @@ pub async fn crawl_url(
     )
     .await?;
 
-    tracing::info!(doc_id = %doc.id, "Document stored, requesting summary");
+    tracing::info!(doc_id = %doc.id, "Document stored in PostgreSQL");
 
     // Step 3: Summarize with Gemini
-    // Truncate content to avoid exceeding Gemini's token limit
     let content_for_summary = truncate_for_summary(&page.text_content, 8000);
 
     let doc = match state.gemini.summarize(&content_for_summary).await {
-        Ok(summary) => {
+        Ok(summary) if !summary.is_empty() => {
             tracing::info!(doc_id = %doc.id, "Summary generated");
             notice_db::documents::update_summary(&state.db, doc.id, &summary).await?
+        }
+        Ok(_) => {
+            tracing::warn!(doc_id = %doc.id, "Gemini returned empty summary");
+            notice_db::documents::mark_summary_failed(&state.db, doc.id).await?;
+            notice_db::documents::get_by_id(&state.db, doc.id)
+                .await?
+                .unwrap_or(doc)
         }
         Err(e) => {
             tracing::warn!(doc_id = %doc.id, error = %e, "Summarization failed");
@@ -114,7 +148,80 @@ pub async fn crawl_url(
         }
     };
 
+    // Step 4: Sync to Meilisearch directly (don't wait for MeiliBridge)
+    sync_to_meilisearch(&state, &doc).await;
+
     Ok(Json(doc))
+}
+
+// ─── Resync all documents to Meilisearch ───
+
+/// POST /api/admin/resync — Push all documents from PostgreSQL to Meilisearch.
+/// Useful when MeiliBridge is down or for initial population.
+pub async fn resync_to_meilisearch(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    tracing::info!("Starting full resync to Meilisearch");
+
+    let total = notice_db::documents::count(&state.db).await?;
+
+    // Process in batches of 100
+    let batch_size: i64 = 100;
+    let mut offset: i64 = 0;
+    let mut synced: i64 = 0;
+    let mut failed: i64 = 0;
+
+    loop {
+        // Fetch full documents (we need raw_content for Meilisearch)
+        let docs = notice_db::documents::list_full(&state.db, batch_size, offset).await?;
+
+        if docs.is_empty() {
+            break;
+        }
+
+        let meili_docs: Vec<MeiliDocumentInput> =
+            docs.iter().map(|doc| doc_row_to_meili(doc)).collect();
+
+        let count = meili_docs.len() as i64;
+
+        match state.search.add_documents(&meili_docs).await {
+            Ok(()) => {
+                synced += count;
+                tracing::info!(
+                    "Synced batch: {} documents (total: {}/{})",
+                    count,
+                    synced,
+                    total
+                );
+            }
+            Err(e) => {
+                failed += count;
+                tracing::error!(error = %e, "Failed to sync batch at offset {}", offset);
+            }
+        }
+
+        offset += batch_size;
+
+        if count < batch_size {
+            break;
+        }
+    }
+
+    let meili_count = state.search.document_count().await.unwrap_or(0);
+
+    tracing::info!(
+        "Resync complete: {} synced, {} failed, {} total in Meilisearch",
+        synced,
+        failed,
+        meili_count
+    );
+
+    Ok(Json(serde_json::json!({
+        "synced": synced,
+        "failed": failed,
+        "total_in_postgres": total,
+        "total_in_meilisearch": meili_count
+    })))
 }
 
 // ─── Document listing ───
@@ -125,7 +232,7 @@ pub struct ListParams {
     pub offset: Option<i64>,
 }
 
-/// GET /api/documents — List documents (paginated).
+/// GET /api/documents — List documents (paginated, no raw_content).
 pub async fn list_documents(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
@@ -144,7 +251,7 @@ pub async fn list_documents(
     })))
 }
 
-/// GET /api/documents/:id — Get a single document.
+/// GET /api/documents/{id}
 pub async fn get_document(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -156,7 +263,7 @@ pub async fn get_document(
     Ok(Json(doc))
 }
 
-/// GET /api/queue/stats — Get crawl queue statistics.
+/// GET /api/queue/stats
 pub async fn queue_stats(
     State(state): State<AppState>,
 ) -> Result<Json<notice_db::crawl_queue::QueueStats>, ApiError> {

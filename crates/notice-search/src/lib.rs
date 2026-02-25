@@ -2,6 +2,7 @@ use meilisearch_sdk::client::Client;
 use meilisearch_sdk::search::Selectors;
 use notice_core::types::SearchResult;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use uuid::Uuid;
 
 const DOCUMENTS_INDEX: &str = "documents";
@@ -12,15 +13,29 @@ pub struct SearchClient {
     client: Client,
 }
 
-/// The shape of a document as stored in the Meilisearch index.
-/// Must match what MeiliBridge syncs from the documents table.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MeiliDocument {
+// ─── Meilisearch Document Types ───
+
+/// What we SEND to Meilisearch (all indexed fields).
+/// Used for direct sync and must match what MeiliBridge sends.
+#[derive(Debug, Clone, Serialize)]
+pub struct MeiliDocumentInput {
     pub id: Uuid,
     pub url: String,
     pub domain: String,
     pub title: Option<String>,
     pub raw_content: String,
+    pub summary: Option<String>,
+    pub status: String,
+}
+
+/// What we READ from Meilisearch search results.
+/// Must match displayed_attributes — does NOT include raw_content.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MeiliDocumentOutput {
+    pub id: Uuid,
+    pub url: String,
+    pub domain: String,
+    pub title: Option<String>,
     pub summary: Option<String>,
     pub status: String,
 }
@@ -45,45 +60,39 @@ impl SearchClient {
     }
 
     /// Configure the documents index with optimal settings.
-    /// Should be called once at startup (idempotent).
+    /// Idempotent — safe to call on every startup.
     pub async fn configure_index(&self) -> Result<(), notice_core::Error> {
-        let index = self.client.index(DOCUMENTS_INDEX);
-
-        // Set the primary key
+        // Create index (ignore if already exists)
         let task = self
             .client
             .create_index(DOCUMENTS_INDEX, Some("id"))
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
-
-        // Wait for index creation (ignore AlreadyExists errors)
         let _ = task.wait_for_completion(&self.client, None, None).await;
 
-        // Searchable attributes: what fields can be searched
+        let index = self.client.index(DOCUMENTS_INDEX);
+
+        // Searchable: what fields are searched (order = priority)
         index
             .set_searchable_attributes(["title", "summary", "raw_content", "url", "domain"])
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
-        // Displayed attributes: what fields are returned in results
+        // Displayed: what fields are returned in results
+        // NOTE: raw_content is deliberately excluded — it's large and
+        // we only need it for search matching, not for display.
         index
             .set_displayed_attributes(["id", "url", "domain", "title", "summary", "status"])
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
-        // Filterable attributes: what fields can be used in filters
+        // Filterable: for faceted search / filtering
         index
             .set_filterable_attributes(["domain", "status"])
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
-        // Sortable attributes
-        index
-            .set_sortable_attributes(["created_at"])
-            .await
-            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
-
-        // Ranking rules (Meilisearch defaults are good, but we customize)
+        // Ranking rules
         index
             .set_ranking_rules([
                 "words",
@@ -99,6 +108,83 @@ impl SearchClient {
         tracing::info!("Meilisearch '{}' index configured", DOCUMENTS_INDEX);
         Ok(())
     }
+
+    // ─── Write Operations (Direct Sync) ───
+
+    /// Add or update documents in Meilisearch.
+    /// Waits for the indexing task to complete (up to 30s).
+    pub async fn add_documents(
+        &self,
+        docs: &[MeiliDocumentInput],
+    ) -> Result<(), notice_core::Error> {
+        if docs.is_empty() {
+            return Ok(());
+        }
+
+        let index = self.client.index(DOCUMENTS_INDEX);
+
+        let task = index
+            .add_documents(docs, Some("id"))
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        let task = task
+            .wait_for_completion(
+                &self.client,
+                Some(Duration::from_millis(200)),
+                Some(Duration::from_secs(30)),
+            )
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        // Check if the task succeeded
+        if task.is_failure() {
+            let error_msg = format!("Meilisearch indexing task failed: {:?}", task);
+            tracing::error!("{}", error_msg);
+            return Err(notice_core::Error::Search(error_msg));
+        }
+
+        tracing::debug!("Indexed {} document(s) in Meilisearch", docs.len());
+        Ok(())
+    }
+
+    /// Add a single document to Meilisearch.
+    pub async fn add_document(&self, doc: MeiliDocumentInput) -> Result<(), notice_core::Error> {
+        self.add_documents(&[doc]).await
+    }
+
+    /// Delete a document from Meilisearch by ID.
+    pub async fn delete_document(&self, id: Uuid) -> Result<(), notice_core::Error> {
+        let index = self.client.index(DOCUMENTS_INDEX);
+
+        let task = index
+            .delete_document(&id.to_string())
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        task.wait_for_completion(
+            &self.client,
+            Some(Duration::from_millis(200)),
+            Some(Duration::from_secs(10)),
+        )
+        .await
+        .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        tracing::debug!("Deleted document {} from Meilisearch", id);
+        Ok(())
+    }
+
+    /// Get the number of documents in the index.
+    pub async fn document_count(&self) -> Result<usize, notice_core::Error> {
+        let index = self.client.index(DOCUMENTS_INDEX);
+        let stats = index
+            .get_stats()
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+        Ok(stats.number_of_documents)
+    }
+
+    // ─── Search ───
 
     /// Search documents. Returns results with snippets.
     pub async fn search(
@@ -118,7 +204,7 @@ impl SearchClient {
             .with_attributes_to_crop(Selectors::Some(&[("summary", None), ("raw_content", None)]))
             .with_crop_length(200)
             .with_attributes_to_highlight(Selectors::Some(&["title", "summary"]))
-            .execute::<MeiliDocument>()
+            .execute::<MeiliDocumentOutput>()
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
@@ -132,7 +218,7 @@ impl SearchClient {
                 let snippet = doc
                     .summary
                     .clone()
-                    .unwrap_or_else(|| truncate(&doc.raw_content, 200));
+                    .unwrap_or_else(|| "No summary available".to_string());
 
                 SearchResult {
                     id: doc.id,
@@ -145,16 +231,5 @@ impl SearchClient {
             .collect();
 
         Ok((search_results, total))
-    }
-}
-
-/// Truncate a string to max_len characters at a word boundary.
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        return s.to_string();
-    }
-    match s[..max_len].rfind(' ') {
-        Some(pos) => format!("{}...", &s[..pos]),
-        None => format!("{}...", &s[..max_len]),
     }
 }

@@ -1,0 +1,10 @@
+[package]
+name = "notice-kg"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+notice-core = { workspace = true }
+petgraph = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }

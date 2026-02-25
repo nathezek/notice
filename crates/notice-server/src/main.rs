@@ -2,6 +2,8 @@ mod error;
 mod routes;
 mod state;
 
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
@@ -13,10 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── 2. Initialize tracing ──
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("notice_server=debug,tower_http=debug")),
-        )
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+            EnvFilter::new("notice_server=debug,notice_crawler=info,tower_http=debug")
+        }))
         .init();
 
     tracing::info!("Starting Notice V2");
@@ -38,7 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 7. Configure Meilisearch index ──
     search_client.configure_index().await?;
 
-    // Log current document count
     match search_client.document_count().await {
         Ok(count) => tracing::info!("Meilisearch documents index: {} documents", count),
         Err(e) => tracing::warn!("Could not get Meilisearch document count: {}", e),
@@ -47,7 +47,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 8. Create Gemini client ──
     let gemini_client = notice_ai::GeminiClient::new(&config.gemini_api_key);
 
-    // Test Gemini connectivity (warn but don't block startup)
     match gemini_client.test_connection().await {
         Ok(()) => tracing::info!("Gemini API connection verified"),
         Err(e) => tracing::warn!(
@@ -56,20 +55,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     }
 
-    // ── 9. Build app state ──
+    // ── 9. Start background crawler ──
+    let crawler_handle = if config.crawler.enabled {
+        tracing::info!("Starting background crawler");
+        let handle = notice_crawler::start_crawler(
+            db_pool.clone(),
+            search_client.clone(),
+            gemini_client.clone(),
+            config.crawler.clone(),
+        );
+        Some(handle)
+    } else {
+        tracing::info!("Background crawler is disabled");
+        None
+    };
+
+    // ── 10. Build app state ──
     let app_state = state::AppState {
         db: db_pool,
         search: search_client,
         gemini: gemini_client,
         jwt_secret: config.jwt_secret.clone(),
+        crawler: Arc::new(RwLock::new(crawler_handle)),
     };
 
-    // ── 10. Build router ──
+    // ── 11. Build router ──
     let app = routes::create_router(app_state)
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive());
 
-    // ── 11. Start server ──
+    // ── 12. Start server ──
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("Server listening on http://{}", addr);

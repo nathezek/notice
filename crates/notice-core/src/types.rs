@@ -74,10 +74,12 @@ pub struct SubmitUrlResponse {
 
 // ─── Crawler Internal ───
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ScrapedPage {
     pub url: String,
     pub title: Option<String>,
     pub text_content: String,
+    /// Raw HTML for link extraction. Not stored in the database.
+    pub raw_html: String,
     pub scraped_at: DateTime<Utc>,
 }

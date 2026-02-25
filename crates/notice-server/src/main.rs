@@ -38,6 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── 7. Configure Meilisearch index ──
     search_client.configure_index().await?;
+    search_client.configure_synonyms().await?;
 
     match search_client.document_count().await {
         Ok(count) => tracing::info!("Meilisearch documents index: {} documents", count),

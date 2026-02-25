@@ -109,6 +109,94 @@ impl SearchClient {
         Ok(())
     }
 
+    /// Configure synonyms for common abbreviations and aliases.
+    /// Meilisearch handles these transparently during search.
+    pub async fn configure_synonyms(&self) -> Result<(), notice_core::Error> {
+        let index = self.client.index(DOCUMENTS_INDEX);
+
+        let mut synonyms = std::collections::HashMap::new();
+
+        // Helper to reduce boilerplate
+        let mut add = |key: &str, vals: &[&str]| {
+            synonyms.insert(
+                key.to_string(),
+                vals.iter().map(|v| v.to_string()).collect::<Vec<String>>(),
+            );
+        };
+
+        // Programming languages
+        add("js", &["javascript"]);
+        add("javascript", &["js"]);
+        add("ts", &["typescript"]);
+        add("typescript", &["ts"]);
+        add("py", &["python"]);
+        add("python", &["py"]);
+        add("rb", &["ruby"]);
+        add("ruby", &["rb"]);
+        add("cpp", &["c++"]);
+        add("c++", &["cpp"]);
+        add("golang", &["go"]);
+        add("go", &["golang"]);
+
+        // Databases
+        add("pg", &["postgresql", "postgres"]);
+        add("postgresql", &["postgres", "pg"]);
+        add("postgres", &["postgresql", "pg"]);
+        add("mongo", &["mongodb"]);
+        add("mongodb", &["mongo"]);
+
+        // Technologies
+        add("k8s", &["kubernetes"]);
+        add("kubernetes", &["k8s"]);
+        add("wasm", &["webassembly"]);
+        add("webassembly", &["wasm"]);
+        add("ml", &["machine learning"]);
+        add("ai", &["artificial intelligence"]);
+        add("os", &["operating system"]);
+        add("db", &["database"]);
+        add("api", &["application programming interface"]);
+        add("cli", &["command line interface"]);
+        add("gui", &["graphical user interface"]);
+        add("tui", &["terminal user interface"]);
+        add("ui", &["user interface"]);
+        add("ux", &["user experience"]);
+        add("oop", &["object oriented programming"]);
+        add("fp", &["functional programming"]);
+
+        // Common abbreviations
+        add("docs", &["documentation"]);
+        add("doc", &["documentation"]);
+        add("config", &["configuration"]);
+        add("auth", &["authentication"]);
+        add("env", &["environment"]);
+        add("repo", &["repository"]);
+        add("lib", &["library"]);
+        add("pkg", &["package"]);
+        add("deps", &["dependencies"]);
+        add("dev", &["development"]);
+        add("prod", &["production"]);
+        add("impl", &["implementation"]);
+        add("fn", &["function"]);
+        add("func", &["function"]);
+        add("var", &["variable"]);
+        add("arg", &["argument"]);
+        add("param", &["parameter"]);
+        add("err", &["error"]);
+        add("msg", &["message"]);
+        add("async", &["asynchronous"]);
+        add("sync", &["synchronous"]);
+
+        let count = synonyms.len();
+
+        index
+            .set_synonyms(&synonyms)
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        tracing::info!("Meilisearch synonyms configured ({} entries)", count);
+        Ok(())
+    }
+
     // ─── Write Operations (Direct Sync) ───
 
     /// Add or update documents in Meilisearch.

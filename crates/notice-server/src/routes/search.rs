@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use notice_classifier::QueryIntent;
 use notice_core::types::{InstantAnswer, SearchResponse};
-use notice_kg::{context, updater};
+use notice_kg::{context, session, updater};
 
 use crate::error::ApiError;
 use crate::state::AppState;
@@ -16,12 +16,10 @@ pub struct SearchParams {
     pub limit: Option<usize>,
     pub offset: Option<usize>,
     pub session_id: Option<String>,
-    /// Optional user ID for personalized search.
-    /// Will come from JWT middleware later.
     pub user_id: Option<Uuid>,
 }
 
-/// GET /api/search?q=your+query&user_id=...
+/// GET /api/search?q=your+query&user_id=...&session_id=...
 pub async fn search(
     State(state): State<AppState>,
     Query(params): Query<SearchParams>,
@@ -34,7 +32,7 @@ pub async fn search(
     let limit = params.limit.unwrap_or(20).min(100);
     let offset = params.offset.unwrap_or(0);
 
-    tracing::info!(query = %query, user_id = ?params.user_id, "Search request");
+    tracing::info!(query = %query, user_id = ?params.user_id, session_id = ?params.session_id, "Search request");
 
     // Step 1: Classify intent
     let intent = notice_classifier::classify(&query, &state.gemini).await;
@@ -107,9 +105,33 @@ pub async fn search(
         }
 
         QueryIntent::Search(search_query) => {
-            // Step 2: Load user's KG context (if logged in)
-            let (user_context, search_query_final) = if let Some(user_id) = params.user_id {
-                // Load context
+            // ────────────────────────────────────────────────
+            // QUERY EXPANSION & DISAMBIGUATION PIPELINE
+            // ────────────────────────────────────────────────
+
+            // Extract entities from the query for KG lookup
+            let extracted = notice_kg::extractor::extract_entities(&search_query);
+            let query_terms: Vec<String> = extracted.iter().map(|e| e.name.clone()).collect();
+
+            // Layer 1: Session Context (disambiguation)
+            let session_ctx = session::build_session_context(
+                &state.db,
+                params.user_id,
+                params.session_id.as_deref(),
+            )
+            .await;
+
+            let session_boost = session::get_session_boost_terms(&search_query, &session_ctx);
+
+            if !session_boost.is_empty() {
+                tracing::debug!(
+                    session_boost = ?session_boost,
+                    "Session context terms"
+                );
+            }
+
+            // Layer 2: KG Context (personalization)
+            let (kg_context, kg_overlapping, kg_expansion) = if let Some(user_id) = params.user_id {
                 let ctx = context::load_user_context(&state.db, user_id, 10)
                     .await
                     .unwrap_or_else(|e| {
@@ -117,42 +139,59 @@ pub async fn search(
                         context::UserContext::anonymous()
                     });
 
+                let overlapping = if ctx.has_context {
+                    context::find_overlapping_entities(&state.db, user_id, &query_terms)
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    vec![]
+                };
+
+                // Layer 3: KG Relationship Expansion
+                let expansion = if ctx.has_context {
+                    context::get_kg_expansion_terms(&state.db, user_id, &query_terms)
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    vec![]
+                };
+
                 if ctx.has_context {
-                    // Extract query terms for overlap detection
-                    let extracted = notice_kg::extractor::extract_entities(&search_query);
-                    let query_terms: Vec<String> =
-                        extracted.iter().map(|e| e.name.clone()).collect();
-
-                    // Find which query terms the user has searched before
-                    let overlapping =
-                        context::find_overlapping_entities(&state.db, user_id, &query_terms)
-                            .await
-                            .unwrap_or_default();
-
-                    // Augment query with context
-                    let augmented = context::augment_query(&search_query, &ctx, &overlapping);
-
                     tracing::info!(
                         user_id = %user_id,
-                        has_context = true,
-                        top_interests = ?ctx.top_interests.iter().take(5).map(|t| &t.term).collect::<Vec<_>>(),
-                        query_augmented = %augmented,
+                        top_interests = ?ctx.top_interests.iter().take(3).map(|t| format!("{}:{}", t.term, t.weight)).collect::<Vec<_>>(),
+                        overlapping = ?overlapping.iter().map(|t| &t.term).collect::<Vec<_>>(),
+                        expansion = ?expansion.iter().map(|t| &t.term).collect::<Vec<_>>(),
                         "KG context loaded"
                     );
-
-                    (Some(ctx), augmented)
-                } else {
-                    tracing::debug!(user_id = %user_id, "No KG context yet for user");
-                    (Some(ctx), search_query.clone())
                 }
+
+                (ctx, overlapping, expansion)
             } else {
-                (None, search_query.clone())
+                (context::UserContext::anonymous(), vec![], vec![])
             };
 
-            // Step 3: Search Meilisearch with the (possibly augmented) query
+            // Build the final augmented query
+            let final_query = context::augment_query(
+                &search_query,
+                &kg_context,
+                &kg_overlapping,
+                &kg_expansion,
+                &session_boost,
+            );
+
+            if final_query != search_query {
+                tracing::info!(
+                    original = %search_query,
+                    augmented = %final_query,
+                    "Query expanded"
+                );
+            }
+
+            // Layer 4: Meilisearch search (synonyms handled automatically)
             let (results, total) = state
                 .search
-                .search(&search_query_final, limit, offset)
+                .search(&final_query, limit, offset)
                 .await
                 .unwrap_or_else(|e| {
                     tracing::error!(error = %e, "Meilisearch query failed");
@@ -161,7 +200,7 @@ pub async fn search(
 
             let results_count = results.len() as i32;
 
-            // Step 4: Record search in history
+            // Record in history
             record_search(
                 &state,
                 &search_query,
@@ -172,12 +211,10 @@ pub async fn search(
             )
             .await;
 
-            // Step 5: Update KG asynchronously (fire and forget)
+            // Update KG asynchronously
             if let Some(user_id) = params.user_id {
                 updater::spawn_kg_update(state.db.clone(), user_id, search_query.clone());
             }
-
-            let _ = user_context; // used for logging above
 
             SearchResponse {
                 query: search_query,
@@ -191,7 +228,7 @@ pub async fn search(
     Ok(Json(response))
 }
 
-/// Record a search in history (fire-and-forget).
+/// Record a search in history.
 async fn record_search(
     state: &AppState,
     query: &str,
@@ -214,7 +251,8 @@ async fn record_search(
     }
 }
 
-/// Basic math expression evaluator.
+// ─── Math evaluator (unchanged) ───
+
 fn evaluate_math(expr: &str) -> String {
     let expr = expr.replace(' ', "");
 

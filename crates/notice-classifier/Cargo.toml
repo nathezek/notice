@@ -1,0 +1,10 @@
+[package]
+name = "notice-classifier"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+notice-core = { workspace = true }
+notice-ai = { workspace = true }
+regex = { workspace = true }
+tracing = { workspace = true }

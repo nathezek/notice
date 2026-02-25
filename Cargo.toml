@@ -1,0 +1,73 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Nathezek"]
+license = "Apache-2.0"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Web framework
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+] }
+
+# Search
+meilisearch-sdk = "0.28"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# HTML parsing
+scraper = "0.22"
+
+# Graph
+petgraph = "0.6"
+
+# Auth
+argon2 = "0.5"
+jsonwebtoken = "9"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utils
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = { version = "2", features = ["serde"] }
+regex = "1"
+dotenvy = "0.15"
+
+# Internal crates
+notice-core = { path = "crates/notice-core" }
+notice-db = { path = "crates/notice-db" }
+notice-search = { path = "crates/notice-search" }
+notice-ai = { path = "crates/notice-ai" }
+notice-classifier = { path = "crates/notice-classifier" }
+notice-crawler = { path = "crates/notice-crawler" }
+notice-kg = { path = "crates/notice-kg" }
+notice-auth = { path = "crates/notice-auth" }

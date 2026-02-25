@@ -1,4 +1,30 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock
 
-/server/target/
-
+# Environment
 .env
+
+# Docker volumes
+pgdata/
+meilidata/
+redisdata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Next.js (web/)
+web/node_modules/
+web/.next/
+web/out/
+
+# sqlx offline mode
+# sqlx-data.json

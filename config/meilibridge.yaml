@@ -1,0 +1,24 @@
+# MeiliBridge configuration
+# We will fill this in after we define the database schema (Step 2)
+# and create the PostgreSQL publication.
+#
+# source:
+#   type: postgresql
+#   host: notice-postgres
+#   port: 5432
+#   database: notice
+#   username: meilibridge
+#   password: meilibridge_pass
+#
+# meilisearch:
+#   url: http://notice-meilisearch:7700
+#   api_key: notice_meili_key_change_me_in_prod
+#
+# redis:
+#   url: redis://notice-redis:6379
+#
+# sync_tasks:
+#   - table: documents
+#     index: documents
+#     primary_key: id
+#     full_sync_on_start: true

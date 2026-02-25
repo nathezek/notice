@@ -1,0 +1,56 @@
+services:
+    postgres:
+        image: postgres:16-alpine
+        container_name: notice-postgres
+        ports:
+            - "5432:5432"
+        environment:
+            POSTGRES_DB: notice
+            POSTGRES_USER: notice_user
+            POSTGRES_PASSWORD: notice_pass
+        command: >
+            postgres
+              -c wal_level=logical
+              -c max_replication_slots=4
+              -c max_wal_senders=4
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U notice_user -d notice"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    meilisearch:
+        image: getmeili/meilisearch:v1.12
+        container_name: notice-meilisearch
+        ports:
+            - "7700:7700"
+        environment:
+            MEILI_MASTER_KEY: notice_meili_key_change_me_in_prod
+            MEILI_ENV: development
+        volumes:
+            - meilidata:/meili_data
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    redis:
+        image: redis:7-alpine
+        container_name: notice-redis
+        ports:
+            - "6379:6379"
+        volumes:
+            - redisdata:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+volumes:
+    pgdata:
+    meilidata:
+    redisdata:

@@ -60,7 +60,7 @@ POST /api/submit {"url":"https://..."}
    - Tested with ASCII, French (è), CJK (能) characters
    - Applied in both worker.rs and content.rs
 
-✅ Crawler noise: same-domain link filtering
+  ✅ Crawler noise: same-domain link filtering
    - Links to other domains are now dropped
    - Wikipedia special pages (Talk:, User:, Special:, etc.) are filtered
    - Queue should now have tens of URLs per crawl, not thousands

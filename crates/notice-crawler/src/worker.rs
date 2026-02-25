@@ -320,7 +320,7 @@ async fn enqueue_discovered_links(db: &PgPool, links: &[String]) -> u64 {
         return 0;
     }
 
-    let count = new_urls.len();
+    let _count = new_urls.len();
 
     match notice_db::crawl_queue::enqueue_batch(db, &new_urls, -1).await {
         Ok(inserted) => {

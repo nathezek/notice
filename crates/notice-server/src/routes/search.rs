@@ -131,15 +131,28 @@ pub async fn search(
                 });
 
             let results_count = results.len() as i32;
+            
+            tracing::debug!(
+                query = %search_query,
+                results = results_count,
+                top_results = ?results.iter().take(5).map(|r| r.title.as_deref().unwrap_or("Untitled")).collect::<Vec<_>>(),
+                "Search results for AI context"
+            );
 
-            // Step 3: On-demand discovery (Triggered if results are insufficient)
-            if results_count < 3 {
-                tracing::info!(query = %search_query, "Insufficient results, triggering discovery");
+            // Step 3: On-demand discovery (Triggered if results are insufficient or irrelevant)
+            let top_score = results.first().and_then(|r| r.score).unwrap_or(0.0);
+            let needs_discovery = results_count < 5 || top_score < 0.6;
+
+            if needs_discovery {
+                tracing::info!(
+                    query = %search_query, 
+                    count = results_count, 
+                    top_score = top_score, 
+                    "Insufficient or irrelevant results, triggering discovery"
+                );
                 let db = state.db.clone();
                 let discovery_query = search_query.clone();
                 
-                // We spawn discovery in the background to not block the current search response,
-                // BUT the next search (or a refresh) will have these new results.
                 tokio::spawn(async move {
                     let discovered_urls = notice_crawler::discovery::find_urls(&discovery_query).await;
                     for url in discovered_urls {

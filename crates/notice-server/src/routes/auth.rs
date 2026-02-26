@@ -4,6 +4,7 @@ use axum::extract::State;
 use notice_core::types::{AuthResponse, CreateUserRequest, LoginRequest};
 
 use crate::error::ApiError;
+use crate::middleware::AuthUser;
 use crate::state::AppState;
 
 /// POST /api/auth/register
@@ -11,7 +12,6 @@ pub async fn register(
     State(state): State<AppState>,
     Json(body): Json<CreateUserRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
-    // Validate input
     if body.username.trim().is_empty() {
         return Err(notice_core::Error::Validation("Username cannot be empty".into()).into());
     }
@@ -23,15 +23,9 @@ pub async fn register(
     }
 
     let username = body.username.trim().to_lowercase();
-
-    // Hash password
     let password_hash = notice_auth::hash_password(&body.password)?;
-
-    // Insert user
     let user = notice_db::users::create(&state.db, &username, &password_hash).await?;
-
-    // Generate JWT
-    let token = notice_auth::create_token(&user.id, &state.jwt_secret)?;
+    let token = notice_auth::create_token(&user.id, &user.username, &state.jwt_secret)?;
 
     tracing::info!(user_id = %user.id, username = %username, "User registered");
 
@@ -49,19 +43,16 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>, ApiError> {
     let username = body.username.trim().to_lowercase();
 
-    // Find user
     let user = notice_db::users::get_by_username(&state.db, &username)
         .await?
         .ok_or_else(|| notice_core::Error::Auth("Invalid username or password".into()))?;
 
-    // Verify password
     let valid = notice_auth::verify_password(&body.password, &user.password_hash)?;
     if !valid {
         return Err(notice_core::Error::Auth("Invalid username or password".into()).into());
     }
 
-    // Generate JWT
-    let token = notice_auth::create_token(&user.id, &state.jwt_secret)?;
+    let token = notice_auth::create_token(&user.id, &user.username, &state.jwt_secret)?;
 
     tracing::info!(user_id = %user.id, "User logged in");
 
@@ -69,5 +60,13 @@ pub async fn login(
         token,
         user_id: user.id,
         username: user.username,
+    }))
+}
+
+/// GET /api/auth/me — Get current user info from JWT
+pub async fn me(auth: AuthUser) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "user_id": auth.user_id,
+        "username": auth.username
     }))
 }

@@ -1,15 +1,14 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use chrono::Utc;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 // ─── Password Hashing ───
 
-/// Hash a plaintext password with Argon2id.
 pub fn hash_password(password: &str) -> Result<String, notice_core::Error> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
@@ -19,7 +18,6 @@ pub fn hash_password(password: &str) -> Result<String, notice_core::Error> {
     Ok(hash.to_string())
 }
 
-/// Verify a password against a stored hash.
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, notice_core::Error> {
     let parsed = PasswordHash::new(hash).map_err(|e| notice_core::Error::Auth(e.to_string()))?;
     Ok(Argon2::default()
@@ -32,15 +30,21 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, notice_core::
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String, // user ID
-    pub exp: usize,  // expiration (unix timestamp)
-    pub iat: usize,  // issued at
+    pub username: String,
+    pub exp: usize,
+    pub iat: usize,
 }
 
 /// Create a JWT for an authenticated user. Valid for 24 hours.
-pub fn create_token(user_id: &Uuid, secret: &str) -> Result<String, notice_core::Error> {
+pub fn create_token(
+    user_id: &Uuid,
+    username: &str,
+    secret: &str,
+) -> Result<String, notice_core::Error> {
     let now = Utc::now();
     let claims = Claims {
         sub: user_id.to_string(),
+        username: username.to_string(),
         iat: now.timestamp() as usize,
         exp: (now + chrono::Duration::hours(24)).timestamp() as usize,
     };
@@ -59,6 +63,12 @@ pub fn verify_token(token: &str, secret: &str) -> Result<Claims, notice_core::Er
         &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::default(),
     )
-    .map_err(|e| notice_core::Error::Auth(e.to_string()))?;
+    .map_err(|e| notice_core::Error::Auth(format!("Invalid token: {}", e)))?;
     Ok(data.claims)
+}
+
+/// Extract the user_id UUID from claims.
+pub fn user_id_from_claims(claims: &Claims) -> Result<Uuid, notice_core::Error> {
+    Uuid::parse_str(&claims.sub)
+        .map_err(|e| notice_core::Error::Auth(format!("Invalid user ID in token: {}", e)))
 }

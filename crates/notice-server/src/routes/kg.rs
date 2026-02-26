@@ -1,25 +1,20 @@
 use axum::Json;
-use axum::extract::{Path, State};
-use uuid::Uuid;
+use axum::extract::State;
 
 use crate::error::ApiError;
+use crate::middleware::AuthUser;
 use crate::state::AppState;
 
-/// GET /api/users/{user_id}/kg — View a user's knowledge graph.
-pub async fn get_user_kg(
+/// GET /api/me/kg — View your own knowledge graph.
+/// Requires authentication.
+pub async fn get_my_kg(
     State(state): State<AppState>,
-    Path(user_id): Path<Uuid>,
+    auth: AuthUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Verify user exists
-    notice_db::users::get_by_id(&state.db, user_id)
-        .await?
-        .ok_or_else(|| notice_core::Error::NotFound("User not found".into()))?;
-
-    let entities = notice_db::knowledge_graph::get_all_entities(&state.db, user_id).await?;
+    let entities = notice_db::knowledge_graph::get_all_entities(&state.db, auth.user_id).await?;
     let relationships =
-        notice_db::knowledge_graph::get_all_relationships(&state.db, user_id).await?;
+        notice_db::knowledge_graph::get_all_relationships(&state.db, auth.user_id).await?;
 
-    // Build a readable graph view
     let entity_list: Vec<serde_json::Value> = entities
         .iter()
         .map(|e| {
@@ -32,8 +27,7 @@ pub async fn get_user_kg(
         })
         .collect();
 
-    // Resolve relationship names
-    let entity_map: std::collections::HashMap<Uuid, &str> =
+    let entity_map: std::collections::HashMap<uuid::Uuid, &str> =
         entities.iter().map(|e| (e.id, e.name.as_str())).collect();
 
     let relationship_list: Vec<serde_json::Value> = relationships
@@ -51,7 +45,8 @@ pub async fn get_user_kg(
         .collect();
 
     Ok(Json(serde_json::json!({
-        "user_id": user_id,
+        "user_id": auth.user_id,
+        "username": auth.username,
         "entities": entity_list,
         "relationships": relationship_list,
         "entity_count": entity_list.len(),
@@ -59,12 +54,13 @@ pub async fn get_user_kg(
     })))
 }
 
-/// GET /api/users/{user_id}/kg/context — View what context would be injected into a search.
-pub async fn get_user_context(
+/// GET /api/me/kg/context — View what context would be injected into your searches.
+/// Requires authentication.
+pub async fn get_my_context(
     State(state): State<AppState>,
-    Path(user_id): Path<Uuid>,
+    auth: AuthUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let context = notice_kg::context::load_user_context(&state.db, user_id, 10).await?;
+    let context = notice_kg::context::load_user_context(&state.db, auth.user_id, 10).await?;
 
     let interests: Vec<serde_json::Value> = context
         .top_interests
@@ -79,7 +75,8 @@ pub async fn get_user_context(
         .collect();
 
     Ok(Json(serde_json::json!({
-        "user_id": user_id,
+        "user_id": auth.user_id,
+        "username": auth.username,
         "has_context": context.has_context,
         "top_interests": interests
     })))

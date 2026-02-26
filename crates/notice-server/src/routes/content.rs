@@ -7,6 +7,7 @@ use notice_core::types::{SubmitUrlRequest, SubmitUrlResponse};
 use notice_search::MeiliDocumentInput;
 
 use crate::error::ApiError;
+use crate::middleware::OptionalAuthUser;
 use crate::state::AppState;
 
 // ─── Helper: sync a document to Meilisearch ───
@@ -40,6 +41,7 @@ async fn sync_to_meilisearch(state: &AppState, doc: &notice_db::documents::Docum
 /// POST /api/submit
 pub async fn submit_url(
     State(state): State<AppState>,
+    auth: OptionalAuthUser,
     Json(body): Json<SubmitUrlRequest>,
 ) -> Result<Json<SubmitUrlResponse>, ApiError> {
     let url = body.url.trim().to_string();
@@ -62,11 +64,16 @@ pub async fn submit_url(
         }));
     }
 
-    let entry = notice_db::crawl_queue::enqueue(&state.db, &url, 0, None).await?;
+    // Use authenticated user_id if available
+    let entry = notice_db::crawl_queue::enqueue(&state.db, &url, 0, auth.user_id()).await?;
 
     match entry {
         Some(row) => {
-            tracing::info!(url = %url, "URL enqueued for crawling");
+            tracing::info!(
+                url = %url,
+                submitted_by = ?auth.user_id(),
+                "URL enqueued for crawling"
+            );
             Ok(Json(SubmitUrlResponse {
                 id: row.id,
                 url: row.url,

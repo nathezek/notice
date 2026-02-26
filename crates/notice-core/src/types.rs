@@ -28,6 +28,7 @@ pub struct SearchResponse {
     pub results: Vec<SearchResult>,
     pub total: usize,
     pub instant_answer: Option<InstantAnswer>,
+    pub ai_answer: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

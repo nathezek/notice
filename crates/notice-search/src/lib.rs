@@ -26,6 +26,7 @@ pub struct MeiliDocumentInput {
     pub raw_content: String,
     pub summary: Option<String>,
     pub status: String,
+    pub quality_score: f64,
 }
 
 /// What we READ from Meilisearch search results.
@@ -38,6 +39,7 @@ pub struct MeiliDocumentOutput {
     pub title: Option<String>,
     pub summary: Option<String>,
     pub status: String,
+    pub quality_score: f64,
 }
 
 impl SearchClient {
@@ -82,7 +84,7 @@ impl SearchClient {
         // NOTE: raw_content is deliberately excluded — it's large and
         // we only need it for search matching, not for display.
         index
-            .set_displayed_attributes(["id", "url", "domain", "title", "summary", "status"])
+            .set_displayed_attributes(["id", "url", "domain", "title", "summary", "status", "quality_score"])
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
@@ -100,6 +102,7 @@ impl SearchClient {
                 "proximity",
                 "attribute",
                 "sort",
+                "quality_score:desc",
                 "exactness",
             ])
             .await
@@ -289,8 +292,11 @@ impl SearchClient {
             .with_limit(limit)
             .with_offset(offset)
             .with_show_ranking_score(true)
-            .with_attributes_to_crop(Selectors::Some(&[("summary", None), ("raw_content", None)]))
-            .with_crop_length(200)
+            // Request crops for both summary and raw_content to have backup context
+            .with_attributes_to_crop(Selectors::Some(&[
+                ("summary", Some(200)),
+                ("raw_content", Some(300)),
+            ]))
             .with_attributes_to_highlight(Selectors::Some(&["title", "summary"]))
             .execute::<MeiliDocumentOutput>()
             .await
@@ -303,10 +309,20 @@ impl SearchClient {
             .into_iter()
             .map(|hit| {
                 let doc = hit.result;
-                let snippet = doc
-                    .summary
-                    .clone()
-                    .unwrap_or_else(|| "No summary available".to_string());
+
+                // Priority for snippet in search results:
+                // 1. Crop of raw_content (metadata)
+                // 2. Summary as fallback
+                let snippet = hit.formatted_result
+                    .as_ref()
+                    .and_then(|f| {
+                        f.get("raw_content")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .unwrap_or_else(|| {
+                        doc.summary.clone().unwrap_or_else(|| "No preview available".to_string())
+                    });
 
                 SearchResult {
                     id: doc.id,

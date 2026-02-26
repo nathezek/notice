@@ -249,38 +249,22 @@ async fn process_url(
         vec![]
     };
 
-    // Step 6: Store in PostgreSQL
-    let doc = notice_db::documents::insert(
+    // Step 6: Calculate quality score
+    let quality_score = calculate_quality_score(target_url, page.title.as_deref(), &page.text_content);
+
+    // Step 7: Store in PostgreSQL
+    let mut doc = notice_db::documents::insert(
         &ctx.db,
         &page.url,
         page.title.as_deref(),
         &page.text_content,
+        quality_score,
     )
     .await?;
 
-    tracing::info!(doc_id = %doc.id, url = %target_url, "Document stored");
+    tracing::info!(doc_id = %doc.id, url = %target_url, quality = %quality_score, "Document stored");
 
-    // Step 7: Summarize with Gemini
-    let content_for_summary = notice_core::truncate_utf8(&page.text_content, 8000).to_string();
-
-    let doc = match ctx.gemini.summarize(&content_for_summary).await {
-        Ok(summary) if !summary.is_empty() => {
-            tracing::debug!(doc_id = %doc.id, "Summary generated");
-            notice_db::documents::update_summary(&ctx.db, doc.id, &summary).await?
-        }
-        Ok(_) => {
-            tracing::debug!(doc_id = %doc.id, "Empty summary from Gemini");
-            notice_db::documents::mark_summary_failed(&ctx.db, doc.id).await?;
-            doc
-        }
-        Err(e) => {
-            tracing::warn!(doc_id = %doc.id, error = %e, "Summarization failed");
-            notice_db::documents::mark_summary_failed(&ctx.db, doc.id).await?;
-            doc
-        }
-    };
-
-    // Step 8: Sync to Meilisearch
+    // Step 8: Index in Meilisearch immediately (Decoupled from summarization)
     let meili_doc = MeiliDocumentInput {
         id: doc.id,
         url: doc.url.clone(),
@@ -289,11 +273,53 @@ async fn process_url(
         raw_content: doc.raw_content.clone(),
         summary: doc.summary.clone(),
         status: doc.status.clone(),
+        quality_score: doc.quality_score,
     };
 
     if let Err(e) = ctx.search.add_document(meili_doc).await {
         tracing::error!(doc_id = %doc.id, error = %e, "Failed to index in Meilisearch");
+    } else {
+        tracing::debug!(doc_id = %doc.id, "Document indexed in Meilisearch");
     }
+
+    // Step 8: Summarize with Gemini (Now happens after indexing)
+    let content_for_summary = notice_core::truncate_utf8(&page.text_content, 8000).to_string();
+    let db_pool = ctx.db.clone();
+    let gemini = ctx.gemini.clone();
+    let search = ctx.search.clone();
+    let doc_id = doc.id;
+
+    // We do this sequentially here for simplicity in the worker loop, 
+    // but the key is that indexing happened ALREADY.
+    match gemini.summarize(&content_for_summary).await {
+        Ok(summary) if !summary.is_empty() => {
+            tracing::debug!(doc_id = %doc_id, "Summary generated");
+            if let Ok(updated_doc) = notice_db::documents::update_summary(&db_pool, doc_id, &summary).await {
+                doc = updated_doc;
+                
+                // Update Meilisearch with the summary
+                let meili_update = MeiliDocumentInput {
+                    id: doc.id,
+                    url: doc.url.clone(),
+                    domain: doc.domain.clone(),
+                    title: doc.title.clone(),
+                    raw_content: doc.raw_content.clone(),
+                    summary: doc.summary.clone(),
+                    status: doc.status.clone(),
+                    quality_score: doc.quality_score,
+                };
+                let _ = search.add_document(meili_update).await;
+            }
+        }
+        Ok(_) => {
+            tracing::debug!(doc_id = %doc_id, "Empty summary from Gemini");
+            let _ = notice_db::documents::mark_summary_failed(&db_pool, doc_id).await;
+        }
+        Err(e) => {
+            tracing::warn!(doc_id = %doc_id, error = %e, "Summarization failed");
+            let _ = notice_db::documents::mark_summary_failed(&db_pool, doc_id).await;
+        }
+    };
 
     Ok(discovered_links)
 }
@@ -334,4 +360,49 @@ async fn enqueue_discovered_links(db: &PgPool, links: &[String]) -> u64 {
             0
         }
     }
+}
+
+/// Calculate a quality score (0.5 to 3.0) based on domain and content.
+fn calculate_quality_score(url_str: &str, title: Option<&str>, content: &str) -> f64 {
+    let mut score: f64 = 1.0;
+
+    // 1. Domain Reputation
+    if let Ok(u) = url::Url::parse(url_str) {
+        if let Some(host) = u.host_str() {
+            let host = host.to_lowercase();
+            if host.contains("wikipedia.org")
+                || host.contains("britannica.com")
+                || host.contains("github.com")
+                || host.contains("stackoverflow.com")
+                || host.starts_with("docs.")
+                || host.contains(".gov")
+                || host.contains(".edu")
+            {
+                score += 0.5;
+            } else if host.contains("twitter.com")
+                || host.contains("x.com")
+                || host.contains("facebook.com")
+                || host.contains("instagram.com")
+            {
+                score -= 0.3;
+            }
+        }
+    }
+
+    // 2. Content Length
+    let len = content.chars().count();
+    if len > 10000 {
+        score += 0.5;
+    } else if len > 5000 {
+        score += 0.3;
+    } else if len < 500 {
+        score -= 0.3;
+    }
+
+    // 3. Title presence
+    if title.is_some() {
+        score += 0.1;
+    }
+
+    score.clamp(0.5, 3.0)
 }

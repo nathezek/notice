@@ -59,6 +59,7 @@ chrono = { version = "0.4", features = ["serde"] }
 url = { version = "2", features = ["serde"] }
 regex = "1"
 dotenvy = "0.15"
+urlencoding = "2"
 
 # Internal crates
 notice-core = { path = "crates/notice-core" }

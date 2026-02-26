@@ -21,6 +21,7 @@ fn doc_row_to_meili(doc: &notice_db::documents::DocumentRow) -> MeiliDocumentInp
         raw_content: doc.raw_content.clone(),
         summary: doc.summary.clone(),
         status: doc.status.clone(),
+        quality_score: doc.quality_score,
     }
 }
 
@@ -121,12 +122,16 @@ pub async fn crawl_url(
     // Scrape
     let page = notice_crawler::scraper_engine::scrape_url(&client, &url, 5_242_880).await?;
 
+    // Calculate quality score
+    let quality_score = 1.0; // Default for immediate crawl for now, or use heuristic
+
     // Store
     let doc = notice_db::documents::insert(
         &state.db,
         &page.url,
         page.title.as_deref(),
         &page.text_content,
+        quality_score,
     )
     .await?;
 

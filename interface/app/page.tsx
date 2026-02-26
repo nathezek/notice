@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import SearchBar from "@/components/search_bar/search_bar";
 import SearchResults from "@/components/search_results/search_results";
 import InstantAnswer from "@/components/instant_answer/instant_answer";
 import SubmitUrl from "@/components/submit_url/submit_url";
+import AiAnswer from "@/components/search_results/ai_answer";
 import { api, type SearchResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
-export default function HomePage() {
+function SearchContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
@@ -110,6 +111,10 @@ export default function HomePage() {
                                 />
                             )}
 
+                            {response.ai_answer && (
+                                <AiAnswer answer={response.ai_answer} />
+                            )}
+
                             {searchTime !== null &&
                                 response.results.length > 0 && (
                                     <p className="mb-1 text-xs">
@@ -133,3 +138,16 @@ export default function HomePage() {
         </div>
     );
 }
+
+export default function HomePage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
+            </div>
+        }>
+            <SearchContent />
+        </Suspense>
+    );
+}
+

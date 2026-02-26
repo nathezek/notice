@@ -1,3 +1,4 @@
+pub mod discovery;
 pub mod links;
 pub mod rate_limiter;
 pub mod robots;

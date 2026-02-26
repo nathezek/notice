@@ -18,6 +18,7 @@ export interface SearchResponse {
     results: SearchResult[];
     total: number;
     instant_answer: InstantAnswer | null;
+    ai_answer: string | null;
 }
 
 export interface AuthResponse {

@@ -82,19 +82,52 @@ pub async fn scrape_url(
         .map(|el| el.text().collect::<String>().trim().to_string())
         .filter(|t| !t.is_empty());
 
-    // Text content
+    // ── Boileplate Stripping ──
+    // We define "noise" elements that often contain navigation, ads, or secondary content.
+    let noise_selectors = [
+        "nav", "header", "footer", "aside", "script", "style", "noscript",
+        ".nav", ".navbar", ".menu", ".footer", ".header", ".sidebar", ".aside",
+        ".ad", ".ads", ".advertisement", ".cookie", ".popup", ".modal",
+        "#nav", "#navbar", "#menu", "#footer", "#header", "#sidebar", "#aside",
+    ];
+
+    let mut noise_nodes = std::collections::HashSet::new();
+    for selector_str in noise_selectors {
+        if let Ok(selector) = scraper::Selector::parse(selector_str) {
+            for element in document.select(&selector) {
+                noise_nodes.insert(element.id());
+            }
+        }
+    }
+
+    // Select content elements
     let content_selector = scraper::Selector::parse(
         "p, h1, h2, h3, h4, h5, h6, li, article, td, th, blockquote, pre, code, figcaption",
-    )
-    .unwrap();
+    ).unwrap();
 
-    let text_content: String = document
-        .select(&content_selector)
-        .map(|el| el.text().collect::<String>())
-        .filter(|text| !text.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let mut text_parts = Vec::new();
+    for element in document.select(&content_selector) {
+        // Skip if this element or any of its ancestors is a noise node
+        let mut is_noise = false;
+        let mut current = Some(element);
+        while let Some(node) = current {
+            if noise_nodes.contains(&node.id()) {
+                is_noise = true;
+                break;
+            }
+            current = node.parent().and_then(scraper::ElementRef::wrap);
+        }
 
+        if !is_noise {
+            let text = element.text().collect::<String>();
+            let trimmed = text.trim().to_string();
+            if !trimmed.is_empty() {
+                text_parts.push(trimmed);
+            }
+        }
+    }
+
+    let text_content = text_parts.join("\n");
     let text_content = text_content.trim().to_string();
 
     if text_content.is_empty() {

@@ -95,6 +95,7 @@ pub async fn scrape_url(
     for selector_str in noise_selectors {
         if let Ok(selector) = scraper::Selector::parse(selector_str) {
             for element in document.select(&selector) {
+                // Store the node ID (POD) to avoid borrowing the selector
                 noise_nodes.insert(element.id());
             }
         }

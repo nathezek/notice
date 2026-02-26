@@ -1,6 +1,6 @@
 use reqwest::Client;
 use scraper::{Html, Selector};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 /// Search discovery using Mojeek and Google (V1 restoration).
 /// Returns a list of URLs found for the given query.
@@ -46,7 +46,7 @@ pub async fn mojeek_search(query: &str) -> Vec<String> {
 
     let document = Html::parse_document(&html);
     let link_sel = Selector::parse("a.ob").unwrap(); // Mojeek result titles
-    
+
     let mut urls: Vec<String> = document
         .select(&link_sel)
         .filter_map(|el| el.value().attr("href").map(|h| h.to_string()))
@@ -92,7 +92,7 @@ pub async fn google_search(query: &str) -> Vec<String> {
 
     let document = Html::parse_document(&html);
     let link_sel = Selector::parse("a").unwrap();
-    
+
     let urls: Vec<String> = document
         .select(&link_sel)
         .filter_map(|el| el.value().attr("href").map(|h| h.to_string()))
@@ -102,7 +102,9 @@ pub async fn google_search(query: &str) -> Vec<String> {
             let raw = h.trim_start_matches("/url?q=");
             let end = raw.find('&').unwrap_or(raw.len());
             let encoded_url = &raw[..end];
-            urlencoding::decode(encoded_url).unwrap_or(encoded_url.into()).to_string()
+            urlencoding::decode(encoded_url)
+                .unwrap_or(encoded_url.into())
+                .to_string()
         })
         .filter(|h| h.starts_with("http") && !h.contains("google.com/"))
         .take(10)

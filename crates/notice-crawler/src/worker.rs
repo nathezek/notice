@@ -254,11 +254,11 @@ async fn process_url(
 
     // Step 7: Store in PostgreSQL
     let mut doc = notice_db::documents::insert(
-        &ctx.db,
-        &page.url,
-        page.title.as_deref(),
-        &page.text_content,
-        quality_score,
+        &ctx.db,            // 1. pool
+        &page.url,          // 2. doc_url
+        page.title.as_deref(), // 3. title
+        &page.text_content, // 4. raw_content
+        quality_score,      // 5. quality_score
     )
     .await?;
 

@@ -5,7 +5,6 @@ use uuid::Uuid;
 
 use notice_classifier::QueryIntent;
 use notice_core::types::{InstantAnswer, SearchResponse};
-use notice_kg::{context, session, updater};
 
 use crate::error::ApiError;
 use crate::middleware::OptionalAuthUser;
@@ -19,8 +18,14 @@ pub struct SearchParams {
     pub session_id: Option<String>,
 }
 
-/// GET /api/search?q=your+query&session_id=...
-/// Optional auth — anonymous search works, personalized search when logged in.
+/// GET /api/search?q=your+query
+///
+/// Pipeline:
+/// 1. Classify intent (calculate / define / timer / search)
+/// 2. If instant answer → return immediately
+/// 3. If search → query Meilisearch directly (synonyms handle expansion)
+/// 4. Record in search history
+/// 5. Return results
 pub async fn search(
     State(state): State<AppState>,
     auth: OptionalAuthUser,
@@ -37,13 +42,12 @@ pub async fn search(
 
     tracing::info!(
         query = %query,
-        user_id = ?user_id,
         authenticated = user_id.is_some(),
         "Search request"
     );
 
     // Step 1: Classify intent
-    let intent = notice_classifier::classify(&query, &state.gemini).await;
+    let intent = notice_classifier::classify(&query);
 
     let response = match intent {
         QueryIntent::Calculate(expr) => {
@@ -113,64 +117,11 @@ pub async fn search(
         }
 
         QueryIntent::Search(search_query) => {
-            // Extract entities from the query
-            let extracted = notice_kg::extractor::extract_entities(&search_query);
-            let query_terms: Vec<String> = extracted.iter().map(|e| e.name.clone()).collect();
-
-            // Layer 1: Session Context
-            let session_ctx =
-                session::build_session_context(&state.db, user_id, params.session_id.as_deref())
-                    .await;
-            let session_boost = session::get_session_boost_terms(&search_query, &session_ctx);
-
-            // Layer 2 & 3: KG Context + Expansion
-            let (kg_context, kg_overlapping, kg_expansion) = if let Some(uid) = user_id {
-                let ctx = context::load_user_context(&state.db, uid, 10)
-                    .await
-                    .unwrap_or_else(|_| context::UserContext::anonymous());
-
-                let overlapping = if ctx.has_context {
-                    context::find_overlapping_entities(&state.db, uid, &query_terms)
-                        .await
-                        .unwrap_or_default()
-                } else {
-                    vec![]
-                };
-
-                let expansion = if ctx.has_context {
-                    context::get_kg_expansion_terms(&state.db, uid, &query_terms)
-                        .await
-                        .unwrap_or_default()
-                } else {
-                    vec![]
-                };
-
-                (ctx, overlapping, expansion)
-            } else {
-                (context::UserContext::anonymous(), vec![], vec![])
-            };
-
-            // Build augmented query
-            let final_query = context::augment_query(
-                &search_query,
-                &kg_context,
-                &kg_overlapping,
-                &kg_expansion,
-                &session_boost,
-            );
-
-            if final_query != search_query {
-                tracing::info!(
-                    original = %search_query,
-                    augmented = %final_query,
-                    "Query expanded"
-                );
-            }
-
-            // Search Meilisearch
+            // Step 2: Search Meilisearch directly
+            // Synonyms are configured in Meilisearch and handle expansion automatically
             let (results, total) = state
                 .search
-                .search(&final_query, limit, offset)
+                .search(&search_query, limit, offset)
                 .await
                 .unwrap_or_else(|e| {
                     tracing::error!(error = %e, "Meilisearch query failed");
@@ -179,7 +130,7 @@ pub async fn search(
 
             let results_count = results.len() as i32;
 
-            // Record history
+            // Step 3: Record in search history
             record_search(
                 &state,
                 &search_query,
@@ -189,11 +140,6 @@ pub async fn search(
                 user_id,
             )
             .await;
-
-            // Update KG
-            if let Some(uid) = user_id {
-                updater::spawn_kg_update(state.db.clone(), uid, search_query.clone());
-            }
 
             SearchResponse {
                 query: search_query,
@@ -228,6 +174,8 @@ async fn record_search(
         tracing::warn!(error = %e, "Failed to record search history");
     }
 }
+
+// ─── Math evaluator ───
 
 fn evaluate_math(expr: &str) -> String {
     let expr = expr.replace(' ', "");

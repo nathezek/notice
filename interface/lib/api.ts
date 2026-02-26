@@ -26,39 +26,6 @@ export interface AuthResponse {
     username: string;
 }
 
-export interface KgEntity {
-    id: string;
-    name: string;
-    type: string;
-    weight: number;
-}
-
-export interface KgRelationship {
-    from: string;
-    to: string;
-    type: string;
-    weight: number;
-}
-
-export interface KgResponse {
-    user_id: string;
-    username: string;
-    entities: KgEntity[];
-    relationships: KgRelationship[];
-    entity_count: number;
-    relationship_count: number;
-}
-
-export interface KgContextResponse {
-    user_id: string;
-    has_context: boolean;
-    top_interests: {
-        term: string;
-        weight: number;
-        type: string;
-    }[];
-}
-
 export interface SubmitUrlResponse {
     id: string;
     url: string;
@@ -214,34 +181,6 @@ class ApiClient {
         if (!res.ok) {
             const err = await res.json();
             throw new Error(err.error || "Submit failed");
-        }
-
-        return res.json();
-    }
-
-    // ── Knowledge Graph ──
-
-    async getMyKg(): Promise<KgResponse> {
-        const res = await fetch(`${this.baseUrl}/api/me/kg`, {
-            headers: this.headers(),
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || "Failed to load knowledge graph");
-        }
-
-        return res.json();
-    }
-
-    async getMyContext(): Promise<KgContextResponse> {
-        const res = await fetch(`${this.baseUrl}/api/me/kg/context`, {
-            headers: this.headers(),
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || "Failed to load context");
         }
 
         return res.json();

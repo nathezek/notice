@@ -41,9 +41,6 @@ reqwest = { version = "0.12", features = ["json"] }
 # HTML parsing
 scraper = "0.22"
 
-# Graph
-petgraph = "0.6"
-
 # Auth
 argon2 = "0.5"
 jsonwebtoken = "9"
@@ -70,5 +67,4 @@ notice-search = { path = "crates/notice-search" }
 notice-ai = { path = "crates/notice-ai" }
 notice-classifier = { path = "crates/notice-classifier" }
 notice-crawler = { path = "crates/notice-crawler" }
-notice-kg = { path = "crates/notice-kg" }
 notice-auth = { path = "crates/notice-auth" }

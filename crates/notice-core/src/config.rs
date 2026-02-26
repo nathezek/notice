@@ -79,9 +79,9 @@ impl AppConfig {
                     "NoticeBot/0.1 (+https://github.com/notice-search; notice-search-engine)".into()
                 }),
                 discover_links: std::env::var("CRAWLER_DISCOVER_LINKS")
-                    .unwrap_or_else(|_| "true".into())
+                    .unwrap_or_else(|_| "false".into())
                     .parse()
-                    .unwrap_or(true),
+                    .unwrap_or(false),
                 max_link_depth: std::env::var("CRAWLER_MAX_LINK_DEPTH")
                     .unwrap_or_else(|_| "1".into())
                     .parse()

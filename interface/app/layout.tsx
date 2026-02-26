@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemesProvider from "@/theme/theme_provider";
-import { Navbar } from "@/modules/navbar/navbar";
-import { AnimatePresence } from "motion/react";
-import { Suspense } from "react";
+import Navbar from "@/modules/navbar/navbar";
+import { AuthProvider } from "@/lib/auth";
 
 export const metadata: Metadata = {
     title: "Notice",
@@ -18,14 +17,12 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <body>
-                <ThemesProvider>
-                    <AnimatePresence mode="wait">
-                        <Suspense fallback={null}>
-                            <Navbar />
-                        </Suspense>
-                    </AnimatePresence>
-                    {children}
-                </ThemesProvider>
+                <AuthProvider>
+                    <ThemesProvider>
+                        <Navbar />
+                        {children}
+                    </ThemesProvider>
+                </AuthProvider>
             </body>
         </html>
     );

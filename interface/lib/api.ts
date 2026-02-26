@@ -188,8 +188,15 @@ class ApiClient {
         );
 
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || "Search failed");
+            // Handle non-JSON error responses (e.g., plain text "Internal Server Error")
+            const contentType = res.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+                const err = await res.json();
+                throw new Error(err.error || `Search failed (${res.status})`);
+            } else {
+                const text = await res.text();
+                throw new Error(text || `Search failed (${res.status})`);
+            }
         }
 
         return res.json();

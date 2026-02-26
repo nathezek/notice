@@ -66,12 +66,10 @@ export default function ProfilePage() {
         <div className="mx-auto max-w-3xl px-4 py-8">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-neutral-700">
                     {user.username}
                 </h1>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    Your personal knowledge graph
-                </p>
+                <p className="mt-1 text-sm">Your personal knowledge graph</p>
             </div>
 
             {/* Stats */}
@@ -86,12 +84,12 @@ export default function ProfilePage() {
 
             {/* Interest Profile */}
             <section className="mb-8">
-                <h2 className="mb-4 text-lg font-semibold text-white">
+                <h2 className="mb-4 text-lg font-semibold text-neutral-600">
                     Interest Profile
                 </h2>
 
                 {kg.entities.length === 0 ? (
-                    <p className="text-sm text-[var(--text-muted)]">
+                    <p className="text-sm">
                         Start searching to build your knowledge graph. Each
                         search teaches Notice about your interests.
                     </p>
@@ -105,21 +103,21 @@ export default function ProfilePage() {
                                     key={entity.id}
                                     className="flex items-center gap-3"
                                 >
-                                    <span className="w-40 truncate text-sm text-[var(--text-secondary)]">
+                                    <span className="w-40 truncate text-sm">
                                         {entity.name}
                                     </span>
-                                    <span className="w-20 text-xs text-[var(--text-muted)]">
+                                    <span className="w-20 text-xs">
                                         {entity.type}
                                     </span>
-                                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+                                    <div className="h-2 flex-1 overflow-hidden rounded-full">
                                         <div
-                                            className="h-full rounded-full bg-[var(--accent)] transition-all"
+                                            className="h-full rounded-full transition-all"
                                             style={{
                                                 width: `${(entity.weight / maxWeight) * 100}%`,
                                             }}
                                         />
                                     </div>
-                                    <span className="w-8 text-right text-xs text-[var(--text-muted)]">
+                                    <span className="w-8 text-right text-xs">
                                         {entity.weight}
                                     </span>
                                 </div>
@@ -131,10 +129,10 @@ export default function ProfilePage() {
             {/* Search Context */}
             {context && context.has_context && (
                 <section className="mb-8">
-                    <h2 className="mb-4 text-lg font-semibold text-white">
+                    <h2 className="mb-4 text-lg font-semibold text-neutral-600">
                         Search Context
                     </h2>
-                    <p className="mb-3 text-sm text-[var(--text-muted)]">
+                    <p className="mb-3 text-sm">
                         These terms are automatically used to personalize your
                         search results:
                     </p>
@@ -142,10 +140,10 @@ export default function ProfilePage() {
                         {context.top_interests.map((interest) => (
                             <span
                                 key={interest.term}
-                                className="rounded-full border border-[var(--border)] bg-[var(--bg-tertiary)] px-3 py-1 text-sm text-[var(--text-secondary)]"
+                                className="rounded-full border px-3 py-1 text-sm"
                             >
                                 {interest.term}
-                                <span className="ml-1 text-[var(--text-muted)]">
+                                <span className="ml-1">
                                     ({interest.weight})
                                 </span>
                             </span>
@@ -157,7 +155,7 @@ export default function ProfilePage() {
             {/* Relationships */}
             {kg.relationships.length > 0 && (
                 <section>
-                    <h2 className="mb-4 text-lg font-semibold text-white">
+                    <h2 className="mb-4 text-lg font-semibold text-neutral-600">
                         Connections
                     </h2>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -167,14 +165,12 @@ export default function ProfilePage() {
                             .map((rel, i) => (
                                 <div
                                     key={i}
-                                    className="flex items-center gap-2 py-1 text-sm text-[var(--text-secondary)]"
+                                    className="flex items-center gap-2 py-1 text-sm"
                                 >
                                     <span>{rel.from}</span>
-                                    <span className="text-[var(--text-muted)]">
-                                        →
-                                    </span>
+                                    <span className="">→</span>
                                     <span>{rel.to}</span>
-                                    <span className="ml-auto text-xs text-[var(--text-muted)]">
+                                    <span className="ml-auto text-xs">
                                         ×{rel.weight}
                                     </span>
                                 </div>
@@ -188,9 +184,9 @@ export default function ProfilePage() {
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
     return (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 text-center">
-            <div className="text-2xl font-bold text-white">{value}</div>
-            <div className="mt-1 text-xs text-[var(--text-muted)]">{label}</div>
+        <div className="rounded-xl border p-4 text-center">
+            <div className="text-2xl font-bold text-neutral-600">{value}</div>
+            <div className="mt-1 text-xs">{label}</div>
         </div>
     );
 }

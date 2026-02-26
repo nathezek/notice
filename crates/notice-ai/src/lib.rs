@@ -196,4 +196,35 @@ impl GeminiClient {
         );
         self.generate(&prompt).await
     }
+
+    /// Generate an answer to a query based on retrieved document snippets (RAG).
+    pub async fn answer_query(
+        &self,
+        query: &str,
+        contexts: &[String],
+    ) -> Result<String, notice_core::Error> {
+        if contexts.is_empty() {
+            return Ok("No relevant context found to answer this query.".to_string());
+        }
+
+        let combined_context = contexts
+            .iter()
+            .enumerate()
+            .map(|(i, c)| format!("Source [{}]:\n{}\n", i + 1, c))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let prompt = format!(
+            "You are Notice, an intelligent search assistant. \
+             Answer the user's query based ONLY on the provided source snippets. \
+             If the sources do not contain the answer, say that you don't have enough information. \
+             Keep your answer professional, concise (2-4 paragraphs), and use markdown for formatting.\n\n\
+             RELEVANT SOURCES:\n{}\n\n\
+             USER QUERY: \"{}\"\n\n\
+             NOTICE ANSWER:",
+            combined_context, query
+        );
+
+        self.generate(&prompt).await
+    }
 }

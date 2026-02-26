@@ -15,6 +15,7 @@ pub struct DocumentRow {
     pub raw_content: String,
     pub summary: Option<String>,
     pub status: String,
+    pub quality_score: f64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -28,6 +29,7 @@ pub struct DocumentListRow {
     pub title: Option<String>,
     pub summary: Option<String>,
     pub status: String,
+    pub quality_score: f64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -41,13 +43,14 @@ pub async fn insert(
     doc_url: &str,
     title: Option<&str>,
     raw_content: &str,
+    quality_score: f64,
 ) -> Result<DocumentRow, notice_core::Error> {
     let domain = extract_domain(doc_url)?;
 
     sqlx::query_as::<_, DocumentRow>(
         r#"
-        INSERT INTO documents (url, domain, title, raw_content)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO documents (url, domain, title, raw_content, quality_score)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING *
         "#,
     )
@@ -55,6 +58,7 @@ pub async fn insert(
     .bind(&domain)
     .bind(title)
     .bind(raw_content)
+    .bind(quality_score)
     .fetch_one(pool)
     .await
     .map_err(|e| match &e {
@@ -125,7 +129,7 @@ pub async fn list(
 ) -> Result<Vec<DocumentListRow>, notice_core::Error> {
     sqlx::query_as::<_, DocumentListRow>(
         r#"
-        SELECT id, url, domain, title, summary, status, created_at, updated_at
+        SELECT id, url, domain, title, summary, status, quality_score, created_at, updated_at
         FROM documents
         ORDER BY created_at DESC
         LIMIT $1 OFFSET $2

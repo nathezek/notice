@@ -26,6 +26,7 @@ pub struct MeiliDocumentInput {
     pub raw_content: String,
     pub summary: Option<String>,
     pub status: String,
+    pub quality_score: f64,
 }
 
 /// What we READ from Meilisearch search results.
@@ -38,6 +39,7 @@ pub struct MeiliDocumentOutput {
     pub title: Option<String>,
     pub summary: Option<String>,
     pub status: String,
+    pub quality_score: f64,
 }
 
 impl SearchClient {
@@ -79,10 +81,10 @@ impl SearchClient {
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
         // Displayed: what fields are returned in results
-        // NOTE: raw_content is deliberately excluded — it's large and
-        // we only need it for search matching, not for display.
+        // NOTE: we include raw_content in displayed_attributes ONLY to allow
+        // Meilisearch to return cropped snippets in formatted_result.
         index
-            .set_displayed_attributes(["id", "url", "domain", "title", "summary", "status"])
+            .set_displayed_attributes(["id", "url", "domain", "title", "summary", "status", "quality_score", "raw_content"])
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
@@ -100,7 +102,25 @@ impl SearchClient {
                 "proximity",
                 "attribute",
                 "sort",
+                "quality_score:desc",
                 "exactness",
+            ])
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        // IMPORTANT: quality_score MUST be sortable to work as a ranking rule
+        index
+            .set_sortable_attributes(["quality_score"])
+            .await
+            .map_err(|e| notice_core::Error::Search(e.to_string()))?;
+
+        // Stop words: common words to ignore for relevance scoring
+        index
+            .set_stop_words([
+                "a", "an", "the", "is", "of", "and", "or", "in", "on", "at", "to", "for", 
+                "with", "by", "about", "what", "how", "why", "where", "when", "which", 
+                "who", "whom", "this", "that", "these", "those", "it", "they", "them", 
+                "he", "she", "his", "her", "i", "you", "we", "me", "us", "my", "your", "our"
             ])
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
@@ -289,24 +309,55 @@ impl SearchClient {
             .with_limit(limit)
             .with_offset(offset)
             .with_show_ranking_score(true)
-            .with_attributes_to_crop(Selectors::Some(&[("summary", None), ("raw_content", None)]))
-            .with_crop_length(200)
+            .with_attributes_to_retrieve(Selectors::All)
+            // Request crops for both summary and raw_content to have backup context
+            .with_attributes_to_crop(Selectors::Some(&[
+                ("summary", Some(250)),
+                ("raw_content", Some(500)),
+            ]))
             .with_attributes_to_highlight(Selectors::Some(&["title", "summary"]))
             .execute::<MeiliDocumentOutput>()
             .await
             .map_err(|e| notice_core::Error::Search(e.to_string()))?;
 
         let total = results.estimated_total_hits.unwrap_or(0);
+        
+        tracing::debug!(
+            query = query,
+            hits = results.hits.len(),
+            total = total,
+            "Meilisearch search results received"
+        );
 
         let search_results: Vec<SearchResult> = results
             .hits
             .into_iter()
             .map(|hit| {
                 let doc = hit.result;
-                let snippet = doc
-                    .summary
-                    .clone()
-                    .unwrap_or_else(|| "No summary available".to_string());
+
+                // Priority for snippet in search results:
+                // 1. Crop of raw_content (if significant)
+                // 2. Crop of summary
+                // 3. Full summary
+                let snippet = hit.formatted_result
+                    .as_ref()
+                    .and_then(|f| {
+                        // Try raw_content crop first
+                        f.get("raw_content")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| s.len() > 10 && *s != "…")
+                            .map(|s| s.to_string())
+                            .or_else(|| {
+                                // Fallback to summary crop
+                                f.get("summary")
+                                    .and_then(|v| v.as_str())
+                                    .filter(|s| s.len() > 10 && *s != "…")
+                                    .map(|s| s.to_string())
+                            })
+                    })
+                    .unwrap_or_else(|| {
+                        doc.summary.clone().unwrap_or_else(|| "No preview available".to_string())
+                    });
 
                 SearchResult {
                     id: doc.id,

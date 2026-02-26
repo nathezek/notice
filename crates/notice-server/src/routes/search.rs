@@ -69,6 +69,7 @@ pub async fn search(
                     answer_type: "calculation".to_string(),
                     value: evaluate_math(&expr),
                 }),
+                ai_answer: None,
             }
         }
 
@@ -91,6 +92,7 @@ pub async fn search(
                     answer_type: "definition".to_string(),
                     value: format!("Definition lookup for '{}' — coming soon", term),
                 }),
+                ai_answer: None,
             }
         }
 
@@ -113,12 +115,12 @@ pub async fn search(
                     answer_type: "timer".to_string(),
                     value: format!("Timer from '{}' — coming soon", command),
                 }),
+                ai_answer: None,
             }
         }
 
         QueryIntent::Search(search_query) => {
             // Step 2: Search Meilisearch directly
-            // Synonyms are configured in Meilisearch and handle expansion automatically
             let (results, total) = state
                 .search
                 .search(&search_query, limit, offset)
@@ -129,8 +131,66 @@ pub async fn search(
                 });
 
             let results_count = results.len() as i32;
+            
+            tracing::debug!(
+                query = %search_query,
+                results = results_count,
+                top_results = ?results.iter().take(5).map(|r| r.title.as_deref().unwrap_or("Untitled")).collect::<Vec<_>>(),
+                "Search results for AI context"
+            );
 
-            // Step 3: Record in search history
+            // Step 3: On-demand discovery (Triggered if results are insufficient or irrelevant)
+            let top_score = results.first().and_then(|r| r.score).unwrap_or(0.0);
+            let needs_discovery = results_count < 5 || top_score < 0.6;
+
+            if needs_discovery {
+                tracing::info!(
+                    query = %search_query, 
+                    count = results_count, 
+                    top_score = top_score, 
+                    "Insufficient or irrelevant results, triggering discovery"
+                );
+                let db = state.db.clone();
+                let discovery_query = search_query.clone();
+                
+                tokio::spawn(async move {
+                    let discovered_urls = notice_crawler::discovery::find_urls(&discovery_query).await;
+                    for url in discovered_urls {
+                        if let Err(e) = notice_db::crawl_queue::enqueue(&db, &url, 10, None).await {
+                            tracing::warn!(url = %url, error = %e, "Failed to enqueue discovered URL");
+                        }
+                    }
+                });
+            }
+
+            // Step 4: Optional RAG Answer
+            // If we have results, generate a synthesized answer using the top document snippets
+            let ai_answer = if !results.is_empty() {
+                let contexts: Vec<String> = results
+                    .iter()
+                    .take(5) // Use top 5 results for context
+                    .map(|r| {
+                        format!(
+                            "Title: {}\nURL: {}\nSnippet: {}",
+                            r.title.as_deref().unwrap_or("Untitled"),
+                            r.url,
+                            r.snippet
+                        )
+                    })
+                    .collect();
+
+                match state.gemini.answer_query(&search_query, &contexts).await {
+                    Ok(answer) => Some(answer),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to generate AI RAG answer");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Step 4: Record in search history
             record_search(
                 &state,
                 &search_query,
@@ -146,6 +206,7 @@ pub async fn search(
                 results,
                 total,
                 instant_answer: None,
+                ai_answer,
             }
         }
     };

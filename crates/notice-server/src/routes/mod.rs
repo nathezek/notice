@@ -13,26 +13,24 @@ use crate::state::AppState;
 
 pub fn create_router(state: AppState) -> Router {
     Router::new()
-        // Health
+        // ── Public (no auth) ──
         .route("/health", get(health::health_check))
-        // Search
-        .route("/api/search", get(search::search))
-        // Auth
         .route("/api/auth/register", post(auth::register))
         .route("/api/auth/login", post(auth::login))
-        // Content
+        // ── Optional auth (works anonymous, personalized when logged in) ──
+        .route("/api/search", get(search::search))
         .route("/api/submit", post(content::submit_url))
         .route("/api/crawl", post(content::crawl_url))
         .route("/api/documents", get(content::list_documents))
         .route("/api/documents/{id}", get(content::get_document))
         .route("/api/queue/stats", get(content::queue_stats))
-        // Crawler control
         .route("/api/crawler/status", get(content::crawler_status))
         .route("/api/crawler/stop", post(content::crawler_stop))
-        // Knowledge Graph
-        .route("/api/users/{user_id}/kg", get(kg::get_user_kg))
-        .route("/api/users/{user_id}/kg/context", get(kg::get_user_context))
-        // Admin
+        // ── Required auth (must be logged in) ──
+        .route("/api/auth/me", get(auth::me))
+        .route("/api/me/kg", get(kg::get_my_kg))
+        .route("/api/me/kg/context", get(kg::get_my_context))
+        // ── Admin ──
         .route("/api/admin/resync", post(content::resync_to_meilisearch))
         // State
         .with_state(state)

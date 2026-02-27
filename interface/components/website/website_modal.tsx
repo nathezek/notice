@@ -31,44 +31,38 @@ export const WebsiteModal = ({
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-100 flex items-center justify-center p-4 md:p-10">
+                <div className="fixed inset-0 z-100 flex items-center justify-center p-4 pt-9 md:px-7">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
                     />
 
                     {/* Modal Content */}
                     <motion.div
                         initial={{ scale: 0.95, opacity: 0, y: 20 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
                         transition={{
                             type: "spring",
-                            damping: 30,
-                            stiffness: 300,
+                            duration: 0.55,
+                            bounce: 0.4,
                         }}
-                        className="relative z-10 flex h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900"
+                        className="relative z-10 flex h-full w-full flex-col overflow-hidden rounded-md border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900"
                     >
                         {/* Header / Browser-like address bar */}
-                        <div className="flex items-center justify-between border-b border-neutral-100 bg-neutral-50/50 p-3 dark:border-neutral-800 dark:bg-neutral-900/50">
-                            <div className="flex items-center gap-2">
-                                <div className="flex gap-1.5 px-2">
-                                    <div className="h-3 w-3 rounded-full bg-red-400/20 dark:bg-red-400/40" />
-                                    <div className="h-3 w-3 rounded-full bg-yellow-400/20 dark:bg-yellow-400/40" />
-                                    <div className="h-3 w-3 rounded-full bg-green-400/20 dark:bg-green-400/40" />
-                                </div>
-                            </div>
+                        <div className="flex h-10 items-center justify-between border-b border-neutral-100 bg-neutral-50/50 p-3 dark:border-neutral-700 dark:bg-neutral-900/50">
+                            <div />
 
-                            <div className="flex h-9 max-w-xl min-w-75 flex-1 items-center gap-x-3 rounded-lg border border-neutral-200 bg-white px-4 text-xs text-neutral-500 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
+                            <div className="flex h-7 max-w-xl min-w-75 flex-1 items-center gap-x-3 rounded-lg bg-neutral-100 px-4 text-xs dark:bg-neutral-700/30">
                                 <IconLock
                                     size={14}
-                                    className="shrink-0 text-green-500/70"
+                                    className="shrink-0 text-blue-500/90"
                                 />
-                                <span className="flex-1 truncate font-medium text-neutral-600 dark:text-neutral-300">
+                                <span className="flex-1 truncate font-medium text-blue-500 dark:text-blue-200">
                                     {website.url}
                                 </span>
                                 <div className="flex shrink-0 gap-2">
@@ -76,7 +70,7 @@ export const WebsiteModal = ({
                                         onClick={() =>
                                             window.open(website.url, "_blank")
                                         }
-                                        className="transition-colors hover:text-blue-500"
+                                        className="cursor-pointer transition-colors hover:text-blue-500"
                                     >
                                         <IconExternalLink size={14} />
                                     </button>
@@ -86,7 +80,7 @@ export const WebsiteModal = ({
                                                 website.url,
                                             )
                                         }
-                                        className="transition-colors hover:text-blue-500"
+                                        className="cursor-pointer transition-colors hover:text-blue-500"
                                     >
                                         <IconCopy size={14} />
                                     </button>

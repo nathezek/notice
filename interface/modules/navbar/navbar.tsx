@@ -28,7 +28,7 @@ export const Navbar = () => {
 
     const lastPushedQuery = useRef<string | null>(null);
 
-    const handleSearch = async (e?: React.FormEvent) => {
+    const handleSearch = async (e?: React.SubmitEvent) => {
         if (e) e.preventDefault();
 
         const trimmed = inputQuery.trim();

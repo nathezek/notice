@@ -164,26 +164,43 @@ pub async fn search(
             }
 
             // Step 4: Optional RAG Answer
-            // If we have results, generate a synthesized answer using the top document snippets
+            // If we have results, generate or fetch a synthesized answer using the top document snippets
             let ai_answer = if !results.is_empty() {
-                let contexts: Vec<String> = results
-                    .iter()
-                    .take(5) // Use top 5 results for context
-                    .map(|r| {
-                        format!(
-                            "Title: {}\nURL: {}\nSnippet: {}",
-                            r.title.as_deref().unwrap_or("Untitled"),
-                            r.url,
-                            r.snippet
-                        )
-                    })
-                    .collect();
+                // Try to get from cache first
+                match notice_db::query_summaries::get_by_query(&state.db, &search_query).await {
+                    Ok(Some(cached)) => {
+                        tracing::info!(query = %search_query, "Using cached AI answer");
+                        Some(cached.answer.to_string())
+                    }
+                    _ => {
+                        let contexts: Vec<String> = results
+                            .iter()
+                            .take(5)
+                            .map(|r| {
+                                format!(
+                                    "Title: {}\nURL: {}\nSnippet: {}",
+                                    r.title.as_deref().unwrap_or("Untitled"),
+                                    r.url,
+                                    r.snippet
+                                )
+                            })
+                            .collect();
 
-                match state.gemini.answer_query(&search_query, &contexts).await {
-                    Ok(answer) => Some(answer),
-                    Err(e) => {
-                        tracing::warn!(error = %e, "Failed to generate AI RAG answer");
-                        None
+                        match state.gemini.answer_query(&search_query, &contexts).await {
+                            Ok(answer) => {
+                                // Attempt to parse as JSON to ensure it's valid before storing
+                                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&answer) {
+                                    if let Err(e) = notice_db::query_summaries::insert(&state.db, &search_query, &json_val).await {
+                                        tracing::warn!(error = %e, "Failed to cache AI answer");
+                                    }
+                                }
+                                Some(answer)
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Failed to generate AI RAG answer");
+                                None
+                            }
+                        }
                     }
                 }
             } else {

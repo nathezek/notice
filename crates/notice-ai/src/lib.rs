@@ -214,15 +214,30 @@ impl GeminiClient {
             .collect::<Vec<_>>()
             .join("\n");
 
+        let instructions = "
+Instructions:
+- Extract and summarize the most important facts. Be concise (2-4 sentences).
+- EXTENSIVELY use **bold text** to highlight key names, dates, amounts, and critical concepts.
+- Use ### headers only for distinct sections.
+- Do not use phrases like 'The text says' or 'According to the source'. Write naturally.";
+
         let prompt = format!(
-            "You are Notice, an intelligent search assistant. \
-             Answer the user's query based ONLY on the provided source snippets. \
-             If the sources do not contain the answer, say that you don't have enough information. \
-             Keep your answer professional, concise (2-4 sentences), and use markdown for formatting.\n\n\
-             RELEVANT SOURCES:\n{}\n\n\
-             USER QUERY: \"{}\"\n\n\
-             NOTICE ANSWER:",
-            combined_context, query
+            "You are a smart search engine assistant. Answer the query based on the content.
+
+            QUERY: '{query}'
+            CONTENT: {ctx}
+
+            {instructions}
+
+            RETURN JSON:
+            {{
+                \"title\": \"Title\",
+                \"summary\": \"Markdown summary\",
+                \"facts\": [ {{ \"label\": \"Fact Label\", \"value\": \"Fact value\" }} ]
+            }}",
+            query = query,
+            ctx = combined_context,
+            instructions = instructions
         );
 
         self.generate(&prompt).await

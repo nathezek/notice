@@ -1,5 +1,6 @@
 pub mod crawl_queue;
 pub mod documents;
+pub mod query_summaries;
 pub mod search_history;
 pub mod users;
 

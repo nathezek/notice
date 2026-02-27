@@ -18,11 +18,13 @@ export interface UniversalResult {
 }
 
 export interface MathResult {
+    type: "math";
     expression: string;
     result: string;
 }
 
 export interface UnitResult {
+    type: "unit_conversion";
     amount: number;
     from: string;
     to: string;
@@ -31,6 +33,7 @@ export interface UnitResult {
 }
 
 export interface CurrencyResult {
+    type: "currency_conversion";
     amount: number;
     from: string;
     to: string;
@@ -39,10 +42,12 @@ export interface CurrencyResult {
 }
 
 export interface ErrorResult {
+    type: "error";
     error: string;
 }
 
 export interface TimerResult {
+    type: "timer";
     seconds: number;
     query: string;
 }

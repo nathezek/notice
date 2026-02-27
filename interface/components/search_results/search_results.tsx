@@ -8,12 +8,21 @@ interface Props {
     onResultClick?: (result: SearchResult) => void;
 }
 
-export default function SearchResults({ results, total, query, onResultClick }: Props) {
+export default function SearchResults({
+    results,
+    total,
+    query,
+    onResultClick,
+}: Props) {
     if (results.length === 0) {
         return (
-            <div className="py-12 text-center animate-in fade-in duration-500">
+            <div className="animate-in fade-in py-12 text-center duration-500">
                 <p className="text-lg text-neutral-500">
-                    No results found for &ldquo;<span className="font-semibold text-neutral-900 dark:text-neutral-100">{query}</span>&rdquo;
+                    No results found for &ldquo;
+                    <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                        {query}
+                    </span>
+                    &rdquo;
                 </p>
                 <p className="mt-2 text-sm text-neutral-400">
                     Try different keywords or submit a URL to index
@@ -24,20 +33,30 @@ export default function SearchResults({ results, total, query, onResultClick }: 
 
     return (
         <div className="animate-in fade-in duration-700">
-            <p className="mb-6 text-xs font-medium text-neutral-400 uppercase tracking-widest">
+            <p className="mb-6 text-xs font-medium tracking-widest text-neutral-400 uppercase">
                 {total} result{total !== 1 ? "s" : ""} found
             </p>
 
             <div className="space-y-12">
                 {results.map((result) => (
-                    <ResultCard key={result.id} result={result} onResultClick={onResultClick} />
+                    <ResultCard
+                        key={result.id}
+                        result={result}
+                        onResultClick={onResultClick}
+                    />
                 ))}
             </div>
         </div>
     );
 }
 
-function ResultCard({ result, onResultClick }: { result: SearchResult; onResultClick?: (result: SearchResult) => void }) {
+function ResultCard({
+    result,
+    onResultClick,
+}: {
+    result: SearchResult;
+    onResultClick?: (result: SearchResult) => void;
+}) {
     const domain = (() => {
         try {
             return new URL(result.url).hostname;
@@ -68,7 +87,7 @@ function ResultCard({ result, onResultClick }: { result: SearchResult; onResultC
                         className="shrink-0 rounded-xs"
                     />
                 </div>
-                <span className="max-w-md truncate text-xs text-neutral-500 font-medium">
+                <span className="max-w-md truncate text-xs font-medium text-neutral-500">
                     {displayUrl}
                 </span>
                 {result.score !== null && (
@@ -90,7 +109,7 @@ function ResultCard({ result, onResultClick }: { result: SearchResult; onResultC
                     }}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xl font-semibold text-blue-600 hover:underline dark:text-blue-400 transition-colors decoration-blue-600/30 underline-offset-4"
+                    className="text-xl font-medium tracking-tight text-blue-600 decoration-blue-600/30 underline-offset-4 transition-colors hover:underline dark:text-blue-400"
                 >
                     {result.title || result.url}
                 </a>

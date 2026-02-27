@@ -1,7 +1,12 @@
 "use client";
 
 import { motion, AnimatePresence } from "motion/react";
-import { IconCopy, IconLock, IconX, IconExternalLink } from "@tabler/icons-react";
+import {
+    IconCopy,
+    IconLock,
+    IconX,
+    IconExternalLink,
+} from "@tabler/icons-react";
 
 export interface WebsiteMetadata {
     url: string;
@@ -58,16 +63,31 @@ export const WebsiteModal = ({
                                 </div>
                             </div>
 
-                            <div className="flex h-9 min-w-[300px] max-w-xl flex-1 items-center gap-x-3 rounded-lg border border-neutral-200 bg-white px-4 text-xs text-neutral-500 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
-                                <IconLock size={14} className="shrink-0 text-green-500/70" />
+                            <div className="flex h-9 max-w-xl min-w-75 flex-1 items-center gap-x-3 rounded-lg border border-neutral-200 bg-white px-4 text-xs text-neutral-500 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
+                                <IconLock
+                                    size={14}
+                                    className="shrink-0 text-green-500/70"
+                                />
                                 <span className="flex-1 truncate font-medium text-neutral-600 dark:text-neutral-300">
                                     {website.url}
                                 </span>
-                                <div className="flex gap-2 shrink-0">
-                                    <button onClick={() => window.open(website.url, '_blank')} className="hover:text-blue-500 transition-colors">
+                                <div className="flex shrink-0 gap-2">
+                                    <button
+                                        onClick={() =>
+                                            window.open(website.url, "_blank")
+                                        }
+                                        className="transition-colors hover:text-blue-500"
+                                    >
                                         <IconExternalLink size={14} />
                                     </button>
-                                    <button onClick={() => navigator.clipboard.writeText(website.url)} className="hover:text-blue-500 transition-colors">
+                                    <button
+                                        onClick={() =>
+                                            navigator.clipboard.writeText(
+                                                website.url,
+                                            )
+                                        }
+                                        className="transition-colors hover:text-blue-500"
+                                    >
                                         <IconCopy size={14} />
                                     </button>
                                 </div>
@@ -82,7 +102,7 @@ export const WebsiteModal = ({
                         </div>
 
                         {/* Body - using iframe */}
-                        <div className="flex-1 bg-white dark:bg-white overflow-hidden">
+                        <div className="flex-1 overflow-hidden bg-white dark:bg-white">
                             <iframe
                                 src={website.url}
                                 title={website.title}

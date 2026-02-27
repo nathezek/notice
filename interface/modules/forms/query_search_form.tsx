@@ -14,7 +14,7 @@ export const QuerySearchForm = ({
 }: T_QUERY_SEARCH_FORM) => {
     return (
         <form
-            className="relative flex h-11 w-full max-w-2xl items-center justify-between gap-x-2 rounded-2xl bg-neutral-200 px-4 dark:bg-neutral-800"
+            className="relative flex h-11 w-full items-center justify-between gap-x-2 rounded-2xl bg-neutral-200/50 px-4 backdrop-blur-xl dark:bg-neutral-800/80"
             onSubmit={handleSearch}
         >
             <IconSearch className="text-neutral-500" size={20} />

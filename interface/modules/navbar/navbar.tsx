@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchStore } from "@/stores/search_store";
 import { QuerySearchForm } from "../forms/query_search_form";
@@ -53,19 +53,19 @@ export const Navbar = () => {
     return (
         <motion.nav
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: hasSearched ? 80 : 450, opacity: 1 }}
+            animate={{ height: hasSearched ? 70 : 450, opacity: 1 }}
             transition={{
                 type: "spring",
                 duration: 1,
                 bounce: 0.3,
             }}
-            className="fixed top-0 z-50 flex w-full items-center justify-center overflow-hidden bg-white/80 backdrop-blur-md dark:bg-neutral-900/80"
+            className="fixed top-0 z-50 flex w-full items-center justify-center overflow-hidden"
         >
             <AnimatePresence mode="wait">
                 {!hasSearched && (
                     <motion.div
                         key="home-layout"
-                        className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-8"
+                        className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-y-4"
                         initial={false}
                         exit={{ opacity: 0, transition: { duration: 0.2 } }}
                     >
@@ -87,7 +87,7 @@ export const Navbar = () => {
                             notice
                         </motion.h1>
 
-                        <div className="w-full px-4">
+                        <div className="w-full px-4 lg:w-3xl">
                             <QuerySearchForm
                                 handleSearch={handleSearch}
                                 inputQuery={inputQuery}
@@ -138,7 +138,7 @@ export const Navbar = () => {
                         exit={{ opacity: 0, transition: { duration: 0.15 } }}
                     >
                         <motion.h1
-                            className="w-24 shrink-0 cursor-pointer text-3xl font-bold tracking-tighter text-neutral-900 italic dark:text-neutral-100"
+                            className="ed-italic w-24 shrink-0 cursor-pointer text-3xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
                             initial={{ opacity: 0, y: -10 }}
                             animate={{
                                 opacity: 1,
@@ -154,7 +154,7 @@ export const Navbar = () => {
                             notice
                         </motion.h1>
 
-                        <div className="max-w-2xl flex-1 px-4">
+                        <div className="max-w-[85%] flex-1 px-4">
                             <QuerySearchForm
                                 handleSearch={handleSearch}
                                 inputQuery={inputQuery}
@@ -162,7 +162,7 @@ export const Navbar = () => {
                             />
                         </div>
 
-                        <div className="flex w-48 shrink-0 items-center justify-end gap-4">
+                        <div className="flex w-28 shrink-0 items-center justify-end gap-4">
                             {user && (
                                 <span className="hidden truncate text-xs text-neutral-500 md:block">
                                     {user.username}

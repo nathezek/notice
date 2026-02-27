@@ -10,16 +10,14 @@ function HomeContent() {
     return (
         <div className="mx-auto max-w-3xl px-4">
             <div className="flex min-h-[70vh] flex-col items-center justify-center">
-                {/* 
-                    The Navbar (refactored) will handle the large logo 
-                    and search bar when on this page.
-                */}
-
-                <div className="mt-60 w-full max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                <div className="animate-in fade-in slide-in-from-bottom-4 mt-60 w-full max-w-xl duration-1000">
                     {user && (
                         <p className="mb-8 text-center text-xs text-neutral-500">
-                            Welcome back, <span className="font-semibold text-indigo-500">{user.username}</span>.
-                            Your personal research assistant is ready.
+                            Welcome back,{" "}
+                            <span className="font-semibold text-indigo-500">
+                                {user.username}
+                            </span>
+                            . Your personal research assistant is ready.
                         </p>
                     )}
                     <SubmitUrl />
@@ -36,4 +34,3 @@ export default function HomePage() {
         </Suspense>
     );
 }
-

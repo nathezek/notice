@@ -65,6 +65,7 @@ interface SearchState {
     isLoading: boolean;
     isSummaryLoading: boolean;
     hasSearched: boolean;
+    isModalOpen: boolean;
     setInputQuery: (query: string) => void;
     setResult: (result: SearchResult | null) => void;
     setResultType: (type: ResultType | null) => void;
@@ -72,6 +73,7 @@ interface SearchState {
     setLoading: (loading: boolean) => void;
     setSummaryLoading: (loading: boolean) => void;
     setHasSearched: (val: boolean) => void;
+    setModalOpen: (val: boolean) => void;
     resetSearch: () => void;
 }
 
@@ -83,6 +85,7 @@ export const useSearchStore = create<SearchState>((set) => ({
     isLoading: false,
     isSummaryLoading: false,
     hasSearched: false,
+    isModalOpen: false,
     setInputQuery: (query) => set({ inputQuery: query }),
     setResult: (result) => set({ result }),
     setResultType: (type) => set({ resultType: type }),
@@ -90,6 +93,7 @@ export const useSearchStore = create<SearchState>((set) => ({
     setLoading: (loading) => set({ isLoading: loading }),
     setSummaryLoading: (loading) => set({ isSummaryLoading: loading }),
     setHasSearched: (val) => set({ hasSearched: val }),
+    setModalOpen: (val) => set({ isModalOpen: val }),
     resetSearch: () =>
         set({
             inputQuery: "",
@@ -99,5 +103,6 @@ export const useSearchStore = create<SearchState>((set) => ({
             isLoading: false,
             isSummaryLoading: false,
             hasSearched: false,
+            isModalOpen: false,
         }),
 }));

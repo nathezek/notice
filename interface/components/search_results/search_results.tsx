@@ -98,7 +98,7 @@ function ResultCard({
             </div>
 
             {/* Title */}
-            <h3 className="mb-2">
+            <h3 className="mb-2 max-w-2xl truncate">
                 <a
                     href={result.url}
                     onClick={(e) => {
@@ -116,7 +116,7 @@ function ResultCard({
             </h3>
 
             {/* Snippet */}
-            <p className="line-clamp-3 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+            <p className="line-clamp-2 max-w-3xl font-sans text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
                 {result.snippet}
             </p>
         </article>

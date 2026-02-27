@@ -20,7 +20,6 @@ function SearchContent() {
 
     const [selectedWebsite, setSelectedWebsite] =
         useState<WebsiteMetadata | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const {
         setInputQuery,
@@ -30,6 +29,8 @@ function SearchContent() {
         setSummaryLoading,
         isLoading,
         result,
+        isModalOpen,
+        setModalOpen,
     } = useSearchStore();
 
     const queryFromUrl =
@@ -125,7 +126,7 @@ function SearchContent() {
                                     url: r.url,
                                     title: r.title || r.url,
                                 });
-                                setIsModalOpen(true);
+                                setModalOpen(true);
                             }}
                         />
                     )}
@@ -134,7 +135,7 @@ function SearchContent() {
 
             <WebsiteModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => setModalOpen(false)}
                 website={selectedWebsite}
             />
         </div>

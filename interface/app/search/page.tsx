@@ -44,26 +44,10 @@ function SearchContent() {
             try {
                 const res = await api.search(query, { limit: 20 });
 
-                // Map the API Response to the Store Result
-                // Note: The store expects a specific structure for UniversalResult if using blocks
-                // For now, we'll adapt based on the simple prompt requirements
-
                 // If it's an instant answer, we handle it separately or map it
                 if (res.instant_answer) {
                     // ... handle specialized result types (math, etc)
                 }
-
-                // We store the raw API response or map it to the store's "UniversalResult" or similar
-                // For now, let's keep it simple and just use the results for the SearchResults component
-                // We'll update the store if needed to handle the full SearchResponse
-
-                // NOTE: The user wants SearchResults to handle the normal hits
-                // and AiAnswer to handle the AI synthesis.
-                // I'll update the store to optionally hold the full response or separate fields.
-
-                // For now, I'll store the response in a way that the page can render it.
-                // Since the store currently has 'result' which is a union,
-                // I'll make sure it can hold what we need.
 
                 setResult({
                     type: "universal",

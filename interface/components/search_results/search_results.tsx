@@ -5,9 +5,10 @@ interface Props {
     results: SearchResult[];
     total: number;
     query: string;
+    onResultClick?: (result: SearchResult) => void;
 }
 
-export default function SearchResults({ results, total, query }: Props) {
+export default function SearchResults({ results, total, query, onResultClick }: Props) {
     if (results.length === 0) {
         return (
             <div className="py-12 text-center animate-in fade-in duration-500">
@@ -29,14 +30,14 @@ export default function SearchResults({ results, total, query }: Props) {
 
             <div className="space-y-12">
                 {results.map((result) => (
-                    <ResultCard key={result.id} result={result} />
+                    <ResultCard key={result.id} result={result} onResultClick={onResultClick} />
                 ))}
             </div>
         </div>
     );
 }
 
-function ResultCard({ result }: { result: SearchResult }) {
+function ResultCard({ result, onResultClick }: { result: SearchResult; onResultClick?: (result: SearchResult) => void }) {
     const domain = (() => {
         try {
             return new URL(result.url).hostname;
@@ -81,6 +82,12 @@ function ResultCard({ result }: { result: SearchResult }) {
             <h3 className="mb-2">
                 <a
                     href={result.url}
+                    onClick={(e) => {
+                        if (onResultClick) {
+                            e.preventDefault();
+                            onResultClick(result);
+                        }
+                    }}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xl font-semibold text-blue-600 hover:underline dark:text-blue-400 transition-colors decoration-blue-600/30 underline-offset-4"

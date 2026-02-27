@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useCallback, Suspense } from "react";
+import { useEffect, useCallback, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import SearchResults from "@/components/search_results/search_results";
 import InstantAnswer from "@/components/instant_answer/instant_answer";
 import AiAnswer from "@/components/search_results/ai_answer";
-import { api } from "@/lib/api";
+import { api, type SearchResult } from "@/lib/api";
 import { useSearchStore } from "@/stores/search_store";
 import { useAuth } from "@/lib/auth";
 import { SearchResultSkeleton } from "@/components/ui/skeleton";
+import { WebsiteModal, type WebsiteMetadata } from "@/components/website/website_modal";
 
 function SearchContent() {
     const searchParams = useSearchParams();
     const { user } = useAuth();
+
+    const [selectedWebsite, setSelectedWebsite] = useState<WebsiteMetadata | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     const {
         setInputQuery,
         setResult,
@@ -108,10 +113,23 @@ function SearchContent() {
                             }))}
                             total={result.websites.length}
                             query={queryFromUrl}
+                            onResultClick={(r) => {
+                                setSelectedWebsite({
+                                    url: r.url,
+                                    title: r.title || r.url,
+                                });
+                                setIsModalOpen(true);
+                            }}
                         />
                     )}
                 </div>
             )}
+
+            <WebsiteModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                website={selectedWebsite}
+            />
         </div>
     );
 }

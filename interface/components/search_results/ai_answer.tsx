@@ -16,7 +16,14 @@ export default function AiAnswer({ answer }: Props) {
     // Attempt to parse the answer as JSON
     let data: AiAnswerData;
     try {
-        data = JSON.parse(answer);
+        // Clean the string in case Gemini wrapped it in markdown code blocks
+        const cleanJson = (str: string) => {
+            const match = str.match(/```json\n([\s\S]*?)\n```/) || str.match(/```([\s\S]*?)```/);
+            return match ? match[1].trim() : str.trim();
+        };
+
+        const cleaned = cleanJson(answer);
+        data = JSON.parse(cleaned);
     } catch (e) {
         // Fallback if not JSON
         data = {

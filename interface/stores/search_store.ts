@@ -18,11 +18,13 @@ export interface UniversalResult {
 }
 
 export interface MathResult {
+    type: "math";
     expression: string;
     result: string;
 }
 
 export interface UnitResult {
+    type: "unit_conversion";
     amount: number;
     from: string;
     to: string;
@@ -31,6 +33,7 @@ export interface UnitResult {
 }
 
 export interface CurrencyResult {
+    type: "currency_conversion";
     amount: number;
     from: string;
     to: string;
@@ -39,10 +42,12 @@ export interface CurrencyResult {
 }
 
 export interface ErrorResult {
+    type: "error";
     error: string;
 }
 
 export interface TimerResult {
+    type: "timer";
     seconds: number;
     query: string;
 }
@@ -60,6 +65,7 @@ interface SearchState {
     isLoading: boolean;
     isSummaryLoading: boolean;
     hasSearched: boolean;
+    isModalOpen: boolean;
     setInputQuery: (query: string) => void;
     setResult: (result: SearchResult | null) => void;
     setResultType: (type: ResultType | null) => void;
@@ -67,6 +73,7 @@ interface SearchState {
     setLoading: (loading: boolean) => void;
     setSummaryLoading: (loading: boolean) => void;
     setHasSearched: (val: boolean) => void;
+    setModalOpen: (val: boolean) => void;
     resetSearch: () => void;
 }
 
@@ -78,6 +85,7 @@ export const useSearchStore = create<SearchState>((set) => ({
     isLoading: false,
     isSummaryLoading: false,
     hasSearched: false,
+    isModalOpen: false,
     setInputQuery: (query) => set({ inputQuery: query }),
     setResult: (result) => set({ result }),
     setResultType: (type) => set({ resultType: type }),
@@ -85,6 +93,7 @@ export const useSearchStore = create<SearchState>((set) => ({
     setLoading: (loading) => set({ isLoading: loading }),
     setSummaryLoading: (loading) => set({ isSummaryLoading: loading }),
     setHasSearched: (val) => set({ hasSearched: val }),
+    setModalOpen: (val) => set({ isModalOpen: val }),
     resetSearch: () =>
         set({
             inputQuery: "",
@@ -94,5 +103,6 @@ export const useSearchStore = create<SearchState>((set) => ({
             isLoading: false,
             isSummaryLoading: false,
             hasSearched: false,
+            isModalOpen: false,
         }),
 }));

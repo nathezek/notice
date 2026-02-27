@@ -28,11 +28,17 @@
 :root {
     --background: var(--color-neutral-50);
     --foreground: var(--color-neutral-800);
+    --success: #22c55e;
+    --warning: #eab308;
+    --error: #ef4444;
 }
 
 .dark {
     --background: var(--color-neutral-900);
     --foreground: var(--color-neutral-100);
+    --success: #22c55e;
+    --warning: #eab308;
+    --error: #ef4444;
 }
 
 body {

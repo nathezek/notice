@@ -1,12 +1,13 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useRouter, usePathname } from "next/navigation";
+import { useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSearchStore } from "@/stores/search_store";
 import { QuerySearchForm } from "../forms/query_search_form";
 import { ThemeSwitcher } from "@/theme/theme_switcher";
-import React, { useRef } from "react";
+import { useAuth } from "@/lib/auth";
+import Link from "next/link";
 
 export const Navbar = () => {
     const {
@@ -18,18 +19,12 @@ export const Navbar = () => {
         isLoading,
     } = useSearchStore();
 
+    const { user, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const searchParams = useSearchParams();
 
     const isSearchPage = pathname === "/search";
     const hasSearched = isSearchPage || isLoading || result !== null;
-
-    useEffect(() => {
-        if (pathname === "/") {
-            // resetSearch(); // optional
-        }
-    }, [pathname]);
 
     const lastPushedQuery = useRef<string | null>(null);
 
@@ -41,8 +36,9 @@ export const Navbar = () => {
         if (trimmed === lastPushedQuery.current) return;
 
         lastPushedQuery.current = trimmed;
-        // Reset the ref after a short delay to allow re-searching the same thing later intentionally
-        setTimeout(() => { lastPushedQuery.current = null; }, 1000);
+        setTimeout(() => {
+            lastPushedQuery.current = null;
+        }, 1000);
 
         router.push(`/search?query=${encodeURIComponent(trimmed)}`);
     };
@@ -57,7 +53,7 @@ export const Navbar = () => {
     return (
         <motion.nav
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: hasSearched ? 80 : 450, opacity: 1 }}
+            animate={{ height: hasSearched ? 70 : 450, opacity: 1 }}
             transition={{
                 type: "spring",
                 duration: 1,
@@ -65,16 +61,14 @@ export const Navbar = () => {
             }}
             className="fixed top-0 z-50 flex w-full items-center justify-center overflow-hidden"
         >
-            {/* ---- HOME STATE: Large centered title + form ---- */}
             <AnimatePresence mode="wait">
                 {!hasSearched && (
                     <motion.div
                         key="home-layout"
-                        className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-8"
+                        className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center gap-y-4"
                         initial={false}
                         exit={{ opacity: 0, transition: { duration: 0.2 } }}
                     >
-                        {/* Only the h1 fades in on mount */}
                         <motion.h1
                             initial={{ opacity: 0, y: 10 }}
                             animate={{
@@ -87,28 +81,54 @@ export const Navbar = () => {
                                     duration: 0.7,
                                 },
                             }}
-                            exit={{
-                                opacity: 0,
-                                y: -10,
-                                transition: { duration: 0.2 },
-                            }}
                             className="ed-italic cursor-pointer text-6xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
                             onClick={handleLogoClick}
                         >
                             notice
                         </motion.h1>
 
-                        <div className="w-full">
+                        <div className="w-full px-4 lg:w-3xl">
                             <QuerySearchForm
                                 handleSearch={handleSearch}
                                 inputQuery={inputQuery}
                                 setInputQuery={setInputQuery}
                             />
                         </div>
+
+                        <div className="flex items-center gap-6 text-sm font-medium">
+                            {user ? (
+                                <div className="flex items-center gap-4">
+                                    <span className="text-neutral-500">
+                                        Hi, {user.username}
+                                    </span>
+                                    <button
+                                        onClick={logout}
+                                        className="transition-colors hover:text-indigo-500"
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-4">
+                                    <Link
+                                        href="/login"
+                                        className="transition-colors hover:text-indigo-500"
+                                    >
+                                        Login
+                                    </Link>
+                                    <Link
+                                        href="/register"
+                                        className="rounded-full bg-neutral-900 px-4 py-2 text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-neutral-900"
+                                    >
+                                        Sign Up
+                                    </Link>
+                                </div>
+                            )}
+                            <ThemeSwitcher />
+                        </div>
                     </motion.div>
                 )}
 
-                {/* ---- SEARCH STATE: Compact bar ---- */}
                 {hasSearched && (
                     <motion.div
                         key="search-layout"
@@ -117,7 +137,6 @@ export const Navbar = () => {
                         animate={{ opacity: 1, transition: { duration: 0.3 } }}
                         exit={{ opacity: 0, transition: { duration: 0.15 } }}
                     >
-                        {/* Left: small logo — fixed width to balance the right side */}
                         <motion.h1
                             className="ed-italic w-24 shrink-0 cursor-pointer text-3xl font-bold tracking-tighter text-neutral-900 dark:text-neutral-100"
                             initial={{ opacity: 0, y: -10 }}
@@ -135,8 +154,7 @@ export const Navbar = () => {
                             notice
                         </motion.h1>
 
-                        {/* Center: search form */}
-                        <div className="flex-1 px-4">
+                        <div className="max-w-[85%] flex-1 px-4">
                             <QuerySearchForm
                                 handleSearch={handleSearch}
                                 inputQuery={inputQuery}
@@ -144,8 +162,12 @@ export const Navbar = () => {
                             />
                         </div>
 
-                        {/* Right: theme switcher — same fixed width as the logo to keep form centered */}
-                        <div className="flex w-24 shrink-0 justify-end">
+                        <div className="flex w-28 shrink-0 items-center justify-end gap-4">
+                            {user && (
+                                <span className="hidden truncate text-xs text-neutral-500 md:block">
+                                    {user.username}
+                                </span>
+                            )}
                             <ThemeSwitcher />
                         </div>
                     </motion.div>
@@ -154,3 +176,5 @@ export const Navbar = () => {
         </motion.nav>
     );
 };
+
+export default Navbar;

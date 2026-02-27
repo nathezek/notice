@@ -1,11 +1,38 @@
 "use client";
 
-export default function Home() {
+import { Suspense } from "react";
+import { useAuth } from "@/lib/auth";
+import Navbar from "@/modules/navbar/navbar";
+
+function HomeContent() {
+    const { user } = useAuth();
+
     return (
-        <div className="flex min-h-screen flex-col items-center justify-end font-sans md:pb-56 dark:bg-neutral-900 dark:text-white">
-            <span className="font-mono text-sm opacity-40">
-                &copy; 2026 Notice
-            </span>
-        </div>
+        <>
+            <Navbar />
+            <div className="mx-auto max-w-3xl px-4">
+                <div className="flex min-h-[70vh] flex-col items-center justify-center">
+                    <div className="animate-in fade-in slide-in-from-bottom-4 mt-60 w-full max-w-xl duration-1000">
+                        {user && (
+                            <p className="mb-8 text-center text-xs text-neutral-500">
+                                Welcome back,{" "}
+                                <span className="font-semibold text-indigo-500">
+                                    {user.username}
+                                </span>
+                                . Your personal research assistant is ready.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}
+
+export default function HomePage() {
+    return (
+        <Suspense fallback={null}>
+            <HomeContent />
+        </Suspense>
     );
 }

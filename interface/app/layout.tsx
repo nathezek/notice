@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import ThemesProvider from "@/theme/theme_provider";
 import { AuthProvider } from "@/lib/auth";
+import Navbar from "@/modules/navbar/navbar";
 
 export const metadata: Metadata = {
     title: "Notice",
@@ -17,7 +18,9 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning>
             <body>
                 <AuthProvider>
-                    <ThemesProvider>{children}</ThemesProvider>
+                    <ThemesProvider>
+                        <Navbar />
+                        {children}</ThemesProvider>
                 </AuthProvider>
             </body>
         </html>

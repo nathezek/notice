@@ -22,7 +22,7 @@ export default function SearchResults({ results, total, query }: Props) {
 
     return (
         <div>
-            <p className="mb-4 text-sm">
+            <p className="serif-font mb-4 text-sm">
                 {total} result{total !== 1 ? "s" : ""}
             </p>
 
@@ -46,15 +46,15 @@ function ResultCard({ result }: { result: SearchResult }) {
     })();
 
     return (
-        <article className="group">
+        <article className="group mb-10">
             {/* URL */}
             <div className="mb-1 flex items-center gap-2">
-                <span className="result-url max-w-md truncate">
+                <span className="result-url max-w-md truncate font-sans text-xs opacity-80">
                     {displayUrl}
                 </span>
                 {result.score !== null && (
-                    <span className="score-badge">
-                        {(result.score * 100).toFixed(0)}%
+                    <span className="score-badge text-sm">
+                        | {(result.score * 100).toFixed(0)}% match
                     </span>
                 )}
             </div>
@@ -65,14 +65,14 @@ function ResultCard({ result }: { result: SearchResult }) {
                     href={result.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="result-title text-lg font-medium"
+                    className="result-title cursor-pointer text-lg font-medium text-blue-800 underline"
                 >
                     {result.title || result.url}
                 </a>
             </h3>
 
             {/* Snippet */}
-            <p className="line-clamp-2 text-sm leading-relaxed">
+            <p className="line-clamp-2 font-sans text-sm leading-relaxed">
                 {result.snippet}
             </p>
         </article>

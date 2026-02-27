@@ -178,7 +178,7 @@ impl GeminiClient {
     /// Summarize web content.
     pub async fn summarize(&self, content: &str) -> Result<String, notice_core::Error> {
         let prompt = format!(
-            "Summarize the following web page content in 2-3 concise sentences. \
+            "Summarize the following web page content in 2-4 concise sentences. \
              Focus on the key information. Do not include any preamble.\n\n{}",
             content
         );
@@ -218,7 +218,7 @@ impl GeminiClient {
             "You are Notice, an intelligent search assistant. \
              Answer the user's query based ONLY on the provided source snippets. \
              If the sources do not contain the answer, say that you don't have enough information. \
-             Keep your answer professional, concise (2-4 paragraphs), and use markdown for formatting.\n\n\
+             Keep your answer professional, concise (2-4 sentences), and use markdown for formatting.\n\n\
              RELEVANT SOURCES:\n{}\n\n\
              USER QUERY: \"{}\"\n\n\
              NOTICE ANSWER:",

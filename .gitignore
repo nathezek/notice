@@ -21,10 +21,14 @@ redisdata/
 .DS_Store
 Thumbs.db
 
-# Next.js (web/)
-web/node_modules/
-web/.next/
-web/out/
+# Next.js (interface/)
+interface/node_modules/
+interface/.next/
+interface/out/
 
 # sqlx offline mode
 # sqlx-data.json
+
+
+# Ignore the explanations folder
+explanations/

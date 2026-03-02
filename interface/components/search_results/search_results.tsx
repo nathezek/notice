@@ -5,6 +5,7 @@ interface Props {
     results: SearchResult[];
     total: number;
     query: string;
+    discoveryStatus?: "idle" | "preparing" | "ready";
     onResultClick?: (result: SearchResult) => void;
 }
 
@@ -12,9 +13,23 @@ export default function SearchResults({
     results,
     total,
     query,
+    discoveryStatus = "idle",
     onResultClick,
 }: Props) {
     if (results.length === 0) {
+        if (discoveryStatus === "preparing") {
+            return (
+                <div className="animate-in fade-in w-full py-12 text-center duration-500">
+                    <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-blue-600 dark:border-neutral-700 dark:border-t-blue-400"></div>
+                    <p className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
+                        Finding results for &ldquo;{query}&rdquo;
+                    </p>
+                    <p className="mt-2 text-sm text-neutral-400">
+                        We're searching the web and preparing fresh content for you.
+                    </p>
+                </div>
+            );
+        }
         return (
             <div className="animate-in fade-in w-full py-12 text-center duration-500">
                 <p className="text-lg text-neutral-500">

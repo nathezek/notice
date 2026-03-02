@@ -5,18 +5,34 @@ import ReactMarkdown from "react-markdown";
 interface AiAnswerData {
     title: string;
     summary: string;
-    facts?: { label: string; value: string }[];
 }
 
 interface Props {
+    title?: string;
     answer: string;
+    isLoading?: boolean;
 }
 
-export default function Summary({ answer }: Props) {
-    // Attempt to parse the answer as JSON
+export default function Summary({ title, answer, isLoading }: Props) {
+    // If we have an explicit title and it's loading, show a skeleton
+    if (isLoading && !answer) {
+        return (
+            <div className="animate-pulse w-full">
+                <div className="mb-4 h-8 w-48 rounded bg-neutral-200 dark:bg-neutral-800"></div>
+                <div className="space-y-3">
+                    <div className="h-4 w-full rounded bg-neutral-100 dark:bg-neutral-800/50"></div>
+                    <div className="h-4 w-5/6 rounded bg-neutral-100 dark:bg-neutral-800/50"></div>
+                    <div className="h-4 w-4/6 rounded bg-neutral-100 dark:bg-neutral-800/50"></div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!answer) return null;
+
+    // Attempt to parse as JSON for backward compatibility or if backend didn't normalize
     let data: AiAnswerData;
     try {
-        // Clean the string in case Gemini wrapped it in markdown code blocks
         const cleanJson = (str: string) => {
             const match =
                 str.match(/```json\n([\s\S]*?)\n```/) ||
@@ -27,9 +43,8 @@ export default function Summary({ answer }: Props) {
         const cleaned = cleanJson(answer);
         data = JSON.parse(cleaned);
     } catch (e) {
-        // Fallback if not JSON
         data = {
-            title: "Overview",
+            title: title || "Overview",
             summary: answer,
         };
     }
@@ -44,8 +59,11 @@ export default function Summary({ answer }: Props) {
         <article className="animate-in fade-in slide-in-from-bottom-4 w-full duration-700">
             <div className="mb-3 flex items-center gap-2 border-b border-neutral-200 pb-1 dark:border-neutral-800">
                 <span className="text-2xl font-medium tracking-tight text-neutral-800 dark:text-neutral-200">
-                    {data.title || "Overview"}
+                    {data.title || title || "Overview"}
                 </span>
+                {isLoading && (
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-800 dark:border-neutral-700 dark:border-t-neutral-200"></div>
+                )}
             </div>
 
             <Article>

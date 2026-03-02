@@ -19,6 +19,14 @@ export interface SearchResponse {
     total: number;
     instant_answer: InstantAnswer | null;
     ai_answer: string | null;
+    discovery_triggered: boolean;
+}
+
+export interface SummaryResponse {
+    query: string;
+    title: string;
+    summary: string;
+    cached: boolean;
 }
 
 export interface AuthResponse {
@@ -156,18 +164,65 @@ class ApiClient {
         );
 
         if (!res.ok) {
-            // Handle non-JSON error responses (e.g., plain text "Internal Server Error")
             const contentType = res.headers.get("content-type") || "";
-            if (contentType.includes("application/json")) {
-                const err = await res.json();
-                throw new Error(err.error || `Search failed (${res.status})`);
-            } else {
-                const text = await res.text();
-                throw new Error(text || `Search failed (${res.status})`);
+            let errorMessage = `Search failed (${res.status})`;
+
+            try {
+                if (contentType.includes("application/json")) {
+                    const err = await res.json();
+                    errorMessage = err.error || errorMessage;
+                } else {
+                    const text = await res.text();
+                    errorMessage = text || errorMessage;
+                }
+            } catch (_) {
+                // Ignore parsing errors and use fallback message
             }
+
+            throw new Error(errorMessage);
         }
 
-        return res.json();
+        try {
+            const data = await res.json();
+            return data;
+        } catch (e) {
+            console.error("Failed to parse search JSON", e);
+            throw new Error("Invalid search response format");
+        }
+    }
+
+    async searchSummary(query: string): Promise<SummaryResponse> {
+        const params = new URLSearchParams({ q: query });
+        const res = await fetch(`${this.baseUrl}/api/search/summary?${params.toString()}`, {
+            headers: this.headers(),
+        });
+
+        if (!res.ok) {
+            const contentType = res.headers.get("content-type") || "";
+            let errorMessage = `Summary fetch failed (${res.status})`;
+
+            try {
+                if (contentType.includes("application/json")) {
+                    const err = await res.json();
+                    errorMessage = err.error || errorMessage;
+                } else {
+                    const text = await res.text();
+                    errorMessage = text || errorMessage;
+                }
+            } catch (_) {
+                // Ignore parsing errors
+            }
+
+            throw new Error(errorMessage);
+        }
+
+        try {
+            const data = await res.json();
+            return data;
+        } catch (e) {
+            console.error("Failed to parse summary JSON", e);
+            throw new Error("Invalid summary response format");
+        }
     }
 
     // ── Content ──

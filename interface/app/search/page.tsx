@@ -13,6 +13,7 @@ import {
     type WebsiteMetadata,
 } from "@/components/website/website_modal";
 import Summary from "@/components/search_results/summary";
+import { useRef } from "react";
 
 function SearchContent() {
     const searchParams = useSearchParams();
@@ -26,33 +27,41 @@ function SearchContent() {
         setResult,
         setResultType,
         setLoading,
+        isSummaryLoading,
         setSummaryLoading,
         isLoading,
         result,
         isModalOpen,
         setModalOpen,
+        discoveryStatus,
+        setDiscoveryStatus,
     } = useSearchStore();
+
+    const lastQueryRef = useRef<string | null>(null);
+    const pollCountRef = useRef(0);
 
     const queryFromUrl =
         searchParams.get("query") || searchParams.get("q") || "";
 
     const performSearch = useCallback(
         async (query: string) => {
+            if (query === lastQueryRef.current) return;
+            lastQueryRef.current = query;
+            pollCountRef.current = 0;
+
             setLoading(true);
             setResult(null);
+            setDiscoveryStatus("idle");
+            setSummaryLoading(false);
 
             try {
+                // Step A: Fast Search (Web Results Only)
                 const res = await api.search(query, { limit: 20 });
-
-                // If it's an instant answer, we handle it separately or map it
-                if (res.instant_answer) {
-                    // ... handle specialized result types (math, etc)
-                }
 
                 setResult({
                     type: "universal",
                     title: query,
-                    summary: res.ai_answer || "",
+                    summary: "", // Decoupled
                     websites: res.results.map((r) => ({
                         url: r.url,
                         title: r.title || r.url,
@@ -61,14 +70,76 @@ function SearchContent() {
                 } as UniversalResult);
 
                 setResultType("concept");
+                setLoading(false); // Display websites immediately
+
+                // Step B: Handle Discovery
+                if (res.discovery_triggered && res.results.length === 0) {
+                    setDiscoveryStatus("preparing");
+                    startPolling(query);
+                }
+
+                // Step C: Fetch AI Summary in background
+                if (res.results.length > 0) {
+                    fetchSummary(query);
+                }
             } catch (err) {
                 console.error("Search failed", err);
-            } finally {
                 setLoading(false);
             }
         },
-        [setLoading, setResult, setResultType],
+        [setLoading, setResult, setResultType, setDiscoveryStatus, setSummaryLoading],
     );
+
+    const fetchSummary = async (query: string) => {
+        setSummaryLoading(true);
+        try {
+            const summaryRes = await api.searchSummary(query);
+            setResult({
+                type: "universal",
+                title: summaryRes.title,
+                summary: summaryRes.summary,
+                websites: useSearchStore.getState().result?.type === "universal"
+                    ? (useSearchStore.getState().result as UniversalResult).websites
+                    : []
+            } as UniversalResult);
+        } catch (err) {
+            console.error("Summary fetch failed", err);
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
+    const startPolling = (query: string) => {
+        const poll = async () => {
+            if (pollCountRef.current >= 5 || lastQueryRef.current !== query) return;
+            pollCountRef.current++;
+
+            try {
+                const res = await api.search(query, { limit: 20 });
+                if (res.results.length > 0) {
+                    setResult({
+                        type: "universal",
+                        title: query,
+                        summary: "",
+                        websites: res.results.map((r) => ({
+                            url: r.url,
+                            title: r.title || r.url,
+                            snippet: r.snippet,
+                        })),
+                    } as UniversalResult);
+                    setDiscoveryStatus("ready");
+                    fetchSummary(query);
+                    return;
+                }
+            } catch (e) {
+                console.error("Polling failed", e);
+            }
+
+            setTimeout(poll, 3000);
+        };
+
+        setTimeout(poll, 3000);
+    };
 
     // Search when URL query changes or on mount
     useEffect(() => {
@@ -88,17 +159,18 @@ function SearchContent() {
 
 
                     {/* Web Results */}
-                    {result?.type === "universal" && result.websites && (
+                    {result?.type === "universal" && (
                         <SearchResults
-                            results={result.websites.map((w, i) => ({
+                            results={(result.websites || []).map((w, i) => ({
                                 id: i.toString(),
                                 url: w.url,
                                 title: w.title,
                                 snippet: w.snippet || "",
                                 score: null,
                             }))}
-                            total={result.websites.length}
+                            total={result.websites?.length || 0}
                             query={queryFromUrl}
+                            discoveryStatus={discoveryStatus}
                             onResultClick={(r) => {
                                 setSelectedWebsite({
                                     url: r.url,
@@ -110,9 +182,13 @@ function SearchContent() {
                     )}
 
                     {/* AI Answer Block */}
-                    {result?.type === "universal" && result.summary && (
+                    {result?.type === "universal" && (result.summary || isSummaryLoading) && (
                         <div className="mb-12 pr-12">
-                            <Summary answer={result.summary} />
+                            <Summary
+                                title={result.title || "Overview"}
+                                answer={result.summary}
+                                isLoading={isSummaryLoading}
+                            />
                         </div>
                     )}
 

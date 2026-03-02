@@ -18,6 +18,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/auth/login", post(auth::login))
         // ── Optional auth ──
         .route("/api/search", get(search::search))
+        .route("/api/search/summary", get(search::search_summary))
         .route("/api/submit", post(content::submit_url))
         .route("/api/crawl", post(content::crawl_url))
         .route("/api/documents", get(content::list_documents))

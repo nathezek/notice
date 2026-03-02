@@ -29,6 +29,15 @@ pub struct SearchResponse {
     pub total: usize,
     pub instant_answer: Option<InstantAnswer>,
     pub ai_answer: Option<String>,
+    pub discovery_triggered: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SummaryResponse {
+    pub query: String,
+    pub title: String,
+    pub summary: String,
+    pub cached: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

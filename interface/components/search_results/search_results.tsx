@@ -1,0 +1,139 @@
+import type { SearchResult } from "@/lib/api";
+import Image from "next/image";
+
+interface Props {
+    results: SearchResult[];
+    total: number;
+    query: string;
+    discoveryStatus?: "idle" | "preparing" | "ready";
+    onResultClick?: (result: SearchResult) => void;
+}
+
+export default function SearchResults({
+    results,
+    total,
+    query,
+    discoveryStatus = "idle",
+    onResultClick,
+}: Props) {
+    if (results.length === 0) {
+        if (discoveryStatus === "preparing") {
+            return (
+                <div className="animate-in fade-in w-full py-12 text-center duration-500">
+                    <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-blue-600 dark:border-neutral-700 dark:border-t-blue-400"></div>
+                    <p className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
+                        Finding results for &ldquo;{query}&rdquo;
+                    </p>
+                    <p className="mt-2 text-sm text-neutral-400">
+                        We're searching the web and preparing fresh content for you.
+                    </p>
+                </div>
+            );
+        }
+        return (
+            <div className="animate-in fade-in w-full py-12 text-center duration-500">
+                <p className="text-lg text-neutral-500">
+                    No results found for &ldquo;
+                    <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                        {query}
+                    </span>
+                    &rdquo;
+                </p>
+                <p className="mt-2 text-sm text-neutral-400">
+                    Try different keywords or submit a URL to index
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="animate-in fade-in duration-700">
+            <p className="mb-6 text-xs font-medium tracking-widest text-neutral-400 uppercase">
+                {total} result{total !== 1 ? "s" : ""} found
+            </p>
+
+            <div className="space-y-12">
+                {results.map((result) => (
+                    <ResultCard
+                        key={result.id}
+                        result={result}
+                        onResultClick={onResultClick}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function ResultCard({
+    result,
+    onResultClick,
+}: {
+    result: SearchResult;
+    onResultClick?: (result: SearchResult) => void;
+}) {
+    const domain = (() => {
+        try {
+            return new URL(result.url).hostname;
+        } catch {
+            return "";
+        }
+    })();
+
+    const displayUrl = (() => {
+        try {
+            const u = new URL(result.url);
+            return u.hostname + (u.pathname !== "/" ? u.pathname : "");
+        } catch {
+            return result.url;
+        }
+    })();
+
+    return (
+        <article className="group">
+            {/* Site Info */}
+            <div className="mb-2 flex items-center gap-2">
+                <div className="flex h-5 w-5 items-center justify-center rounded-sm bg-neutral-100 p-0.5 dark:bg-neutral-800">
+                    <Image
+                        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                        alt=""
+                        width={16}
+                        height={16}
+                        className="shrink-0 rounded-xs"
+                    />
+                </div>
+                <span className="max-w-md truncate text-xs font-medium text-neutral-500">
+                    {displayUrl}
+                </span>
+                {result.score !== null && (
+                    <span className="text-[10px] font-bold text-indigo-400/80">
+                        {(result.score * 100).toFixed(0)}%
+                    </span>
+                )}
+            </div>
+
+            {/* Title */}
+            <h3 className="mb-2 max-w-2xl truncate">
+                <a
+                    href={result.url}
+                    onClick={(e) => {
+                        if (onResultClick) {
+                            e.preventDefault();
+                            onResultClick(result);
+                        }
+                    }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xl font-medium tracking-tight text-blue-600 decoration-blue-600/30 underline-offset-4 transition-colors hover:underline dark:text-blue-400"
+                >
+                    {result.title || result.url}
+                </a>
+            </h3>
+
+            {/* Snippet */}
+            <p className="line-clamp-2 max-w-3xl font-sans text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+                {result.snippet}
+            </p>
+        </article>
+    );
+}

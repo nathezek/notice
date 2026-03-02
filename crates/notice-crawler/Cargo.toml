@@ -1,0 +1,22 @@
+[package]
+name = "notice-crawler"
+version = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+notice-core = { workspace = true }
+notice-db = { workspace = true }
+notice-search = { workspace = true }
+notice-ai = { workspace = true }
+
+reqwest = { workspace = true }
+urlencoding = { workspace = true }
+scraper = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+serde = { workspace = true }
+sqlx = { workspace = true }
+
+tokio-util = { workspace = true }

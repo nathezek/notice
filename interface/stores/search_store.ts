@@ -18,11 +18,13 @@ export interface UniversalResult {
 }
 
 export interface MathResult {
+    type: "math";
     expression: string;
     result: string;
 }
 
 export interface UnitResult {
+    type: "unit_conversion";
     amount: number;
     from: string;
     to: string;
@@ -31,6 +33,7 @@ export interface UnitResult {
 }
 
 export interface CurrencyResult {
+    type: "currency_conversion";
     amount: number;
     from: string;
     to: string;
@@ -39,10 +42,12 @@ export interface CurrencyResult {
 }
 
 export interface ErrorResult {
+    type: "error";
     error: string;
 }
 
 export interface TimerResult {
+    type: "timer";
     seconds: number;
     query: string;
 }
@@ -59,14 +64,18 @@ interface SearchState {
     correctedQuery: string | null;
     isLoading: boolean;
     isSummaryLoading: boolean;
+    discoveryStatus: "idle" | "preparing" | "ready";
     hasSearched: boolean;
+    isModalOpen: boolean;
     setInputQuery: (query: string) => void;
     setResult: (result: SearchResult | null) => void;
     setResultType: (type: ResultType | null) => void;
     setCorrectedQuery: (q: string | null) => void;
     setLoading: (loading: boolean) => void;
     setSummaryLoading: (loading: boolean) => void;
+    setDiscoveryStatus: (status: "idle" | "preparing" | "ready") => void;
     setHasSearched: (val: boolean) => void;
+    setModalOpen: (val: boolean) => void;
     resetSearch: () => void;
 }
 
@@ -77,14 +86,18 @@ export const useSearchStore = create<SearchState>((set) => ({
     correctedQuery: null,
     isLoading: false,
     isSummaryLoading: false,
+    discoveryStatus: "idle",
     hasSearched: false,
+    isModalOpen: false,
     setInputQuery: (query) => set({ inputQuery: query }),
     setResult: (result) => set({ result }),
     setResultType: (type) => set({ resultType: type }),
     setCorrectedQuery: (q) => set({ correctedQuery: q }),
     setLoading: (loading) => set({ isLoading: loading }),
     setSummaryLoading: (loading) => set({ isSummaryLoading: loading }),
+    setDiscoveryStatus: (status) => set({ discoveryStatus: status }),
     setHasSearched: (val) => set({ hasSearched: val }),
+    setModalOpen: (val) => set({ isModalOpen: val }),
     resetSearch: () =>
         set({
             inputQuery: "",
@@ -93,6 +106,8 @@ export const useSearchStore = create<SearchState>((set) => ({
             correctedQuery: null,
             isLoading: false,
             isSummaryLoading: false,
+            discoveryStatus: "idle",
             hasSearched: false,
+            isModalOpen: false,
         }),
 }));

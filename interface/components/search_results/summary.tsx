@@ -52,22 +52,7 @@ export default function Summary({ answer }: Props) {
                 <ReactMarkdown>{processedSummary}</ReactMarkdown>
             </Article>
 
-            {data.facts && data.facts.length > 0 && (
-                <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl bg-neutral-50 p-5 md:grid-cols-2 dark:bg-neutral-800/50">
-                    {data.facts.map((fact, i) => (
-                        <div key={i} className="flex flex-col">
-                            <span className="text-[10px] font-bold tracking-wider text-neutral-400 uppercase">
-                                {fact.label}
-                            </span>
-                            <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                                {fact.value}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            <div className="mt-4 flex items-center gap-2 border-t border-neutral-100 pt-3 text-[10px] text-neutral-400 dark:border-neutral-800">
+            <div className="mt-4 font-sans flex items-center gap-2 border-t border-neutral-100 pt-3 text-[10px] text-neutral-400 dark:border-neutral-800">
                 <span>Synthesized from top results</span>
             </div>
         </article>

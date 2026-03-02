@@ -79,19 +79,13 @@ function SearchContent() {
     }, [queryFromUrl, setInputQuery, performSearch]);
 
     return (
-        <div className="mx-auto max-w-[80%] px-8 pt-32 pb-20">
+        <div className="mx-auto max-w-[90%] px-4 pt-32 pb-20">
             {isLoading ? (
                 <SearchResultSkeleton />
             ) : (
-                <div className="space-y-10">
+                <div className="grid grid-cols-2 gap-x-12">
                     {/* Instant Answer (Calculation, etc.) would go here */}
 
-                    {/* AI Answer Block */}
-                    {result?.type === "universal" && result.summary && (
-                        <div className="mb-12">
-                            <Summary answer={result.summary} />
-                        </div>
-                    )}
 
                     {/* Web Results */}
                     {result?.type === "universal" && result.websites && (
@@ -114,6 +108,16 @@ function SearchContent() {
                             }}
                         />
                     )}
+
+                    {/* AI Answer Block */}
+                    {result?.type === "universal" && result.summary && (
+                        <div className="mb-12 pr-12">
+                            <Summary answer={result.summary} />
+                        </div>
+                    )}
+
+
+
                 </div>
             )}
 

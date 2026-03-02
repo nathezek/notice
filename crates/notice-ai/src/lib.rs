@@ -233,7 +233,6 @@ Instructions:
             {{
                 \"title\": \"Title\",
                 \"summary\": \"Markdown summary\",
-                \"facts\": [ {{ \"label\": \"Fact Label\", \"value\": \"Fact value\" }} ]
             }}",
             query = query,
             ctx = combined_context,

@@ -16,7 +16,7 @@ export default function SearchResults({
 }: Props) {
     if (results.length === 0) {
         return (
-            <div className="animate-in fade-in py-12 text-center duration-500">
+            <div className="animate-in fade-in w-full py-12 text-center duration-500">
                 <p className="text-lg text-neutral-500">
                     No results found for &ldquo;
                     <span className="font-semibold text-neutral-900 dark:text-neutral-100">
